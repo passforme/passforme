@@ -152,7 +152,8 @@ cargo test --workspace
 Read the two documents above before changing anything that touches a
 secret. How everything else works, and why each decision was taken, is
 in [`docs/design.md`](docs/design.md), written for people and their
-agents alike; the rules the code follows are in [`AGENTS.md`](AGENTS.md).
+agents alike; the rules the code follows are in [`AGENTS.md`](AGENTS.md),
+and [`CONTRIBUTING.md`](CONTRIBUTING.md) is where a contribution starts.
 Changes to a command are followed by an update of the guide in
 [passforme/website](https://github.com/passforme/website).
 

@@ -97,8 +97,8 @@ is written into `docs/design.md`, dated, with what it replaced.
   section as the release notes. Linux only: the client needs `prctl`,
   `/proc` and `wl-copy`.
 - License **AGPL-3.0-only**: a modified sync server offered to others
-  must publish its changes. Outside contributions need a CLA or DCO
-  decision before the first one is merged.
+  must publish its changes. Outside contributions are signed off
+  under the DCO (`git commit -s`), as `CONTRIBUTING.md` says.
 - **Build on the developer's machine, never on the server.** A server only
   receives a binary (`bin/deploy`) or an image; releases are built on
   Ubuntu 22.04 runners so the binaries need only glibc 2.35.
@@ -139,6 +139,7 @@ project.
 | `docs/self-hosting.md` | How anyone runs the sync server, systemd or Docker, Tailscale recommended. |
 | `docs/brand/` | The two logos the README shows, copied from the brand kit in [passforme/website](https://github.com/passforme/website) (`site/brand/logo/`), where they are generated; when the kit changes, copy them again. |
 | `tools/*_reference.py` | Independent Python implementations the cryptography and TOTP tests are checked against. |
+| `CONTRIBUTING.md` | What a contributor reads first: issue before code, the rules in short, DCO sign-off. |
 | `SECURITY.md` | How to report a vulnerability (`hello@passforme.com`); only the latest release gets fixes. |
 | `CHANGELOG.md` | Keep a Changelog; every user-visible change adds a line under `[Unreleased]`, and the release workflow uses the version's section as the release notes. |
 
