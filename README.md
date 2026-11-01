@@ -27,7 +27,7 @@ passwords where they are today as well, until it has.
 
 > **Status:** in development. Linux only, with the clipboard on Wayland
 > (`wl-copy`). The command guide, in English and Portuguese, is at
-> [passforme.com/guide.html](https://passforme.com/guide.html)
+> [passforme.com/guide](https://passforme.com/guide)
 > (source: [passforme/website](https://github.com/passforme/website)).
 
 ## Install
