@@ -67,7 +67,7 @@ jobs:
           tar -C dist -czf "dist/$base.tar.gz" "$base"
           (cd dist && sha256sum "$base.tar.gz" > "$base.tar.gz.sha256")
           rm -rf dist/"$base"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.target }}
           path: dist/*
