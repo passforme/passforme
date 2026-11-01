@@ -1,0 +1,185 @@
+# Release on tag. Builds each Linux target on its native runner, packages
+# passforme-<version>-<target>.tar.gz (the client, the sync server and its
+# systemd unit) with a .sha256, and creates the GitHub Release with the
+# matching CHANGELOG.md section as its body.
+#
+# Linux only: the client needs prctl, /proc and Wayland's wl-copy. Built on
+# Ubuntu 22.04 so the binaries need only glibc 2.35 (Debian 12, Ubuntu 22.04
+# and newer). The docker job packages the same server binaries as
+# ghcr.io/passforme/passforme-server for amd64 and arm64.
+#
+# Ship with:   git tag vX.Y.Z && git push --tags
+# Re-run with: Actions -> Release -> Run workflow -> tag
+name: Release
+
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag to release (e.g. v1.2.3)
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  NAME: passforme
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: x86_64-unknown-linux-gnu,  os: ubuntu-22.04 }
+          - { target: aarch64-unknown-linux-gnu, os: ubuntu-22.04-arm }
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      # Both targets build on their native runner, so the tests are meaningful.
+      - run: cargo test --workspace --locked --target ${{ matrix.target }}
+      - run: cargo build --release --locked --target ${{ matrix.target }} -p passforme -p passforme-server
+
+      - name: Package
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${{ inputs.tag || github.ref_name }}"
+          version="${tag#v}"
+          target="${{ matrix.target }}"
+          base="${NAME}-${version}-${target}"
+          mkdir -p dist/"$base"
+          cp "target/$target/release/passforme" "target/$target/release/passforme-server" dist/"$base"/
+          cp contrib/passforme-server.service README.md LICENSE CHANGELOG.md dist/"$base"/
+          tar -C dist -czf "dist/$base.tar.gz" "$base"
+          (cd dist && sha256sum "$base.tar.gz" > "$base.tar.gz.sha256")
+          rm -rf dist/"$base"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: dist/*
+          if-no-files-found: error
+
+  release:
+    name: GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Release notes from CHANGELOG.md
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${{ inputs.tag || github.ref_name }}"
+          version="${tag#v}"
+          awk -v ver="$version" '
+            /^## \[/ { if (found) exit; found = index($0, "## [" ver "]") == 1; next }
+            found { print }
+          ' CHANGELOG.md > notes.md
+          if [[ ! -s notes.md ]]; then
+            echo "CHANGELOG.md has no section for $version; add it and re-tag." >&2
+            exit 1
+          fi
+          {
+            echo
+            echo "## Install"
+            echo
+            echo "Download the archive for your machine, check it and put \`passforme\` on your PATH:"
+            echo
+            echo '```sh'
+            echo "sha256sum -c ${NAME}-${version}-x86_64-unknown-linux-gnu.tar.gz.sha256"
+            echo "tar -xzf ${NAME}-${version}-x86_64-unknown-linux-gnu.tar.gz"
+            echo "install -m 755 ${NAME}-${version}-x86_64-unknown-linux-gnu/passforme ~/.local/bin/"
+            echo '```'
+            echo
+            echo "## Checksums"
+            echo
+            echo '```'
+            cat dist/*.sha256
+            echo '```'
+          } >> notes.md
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag || github.ref_name }}
+          body_path: notes.md
+          files: dist/*
+
+  # Downstream packaging reuses the artifacts above; it never rebuilds.
+  docker:
+    name: Docker image
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Server binaries as the build context
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${{ inputs.tag || github.ref_name }}"
+          version="${tag#v}"
+          for pair in amd64:x86_64-unknown-linux-gnu arm64:aarch64-unknown-linux-gnu; do
+            arch="${pair%%:*}"; target="${pair#*:}"
+            base="${NAME}-${version}-${target}"
+            (cd dist && sha256sum -c "$base.tar.gz.sha256")
+            mkdir -p "context/linux/$arch"
+            tar -xzf "dist/$base.tar.gz" -C context --strip-components=1 "$base/passforme-server"
+            mv context/passforme-server "context/linux/$arch/"
+          done
+          cp Dockerfile context/
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ghcr.io/passforme/passforme-server
+          tags: |
+            type=semver,pattern={{version}},value=${{ inputs.tag || github.ref_name }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ inputs.tag || github.ref_name }}
+            type=raw,value=latest
+      - uses: docker/build-push-action@v6
+        with:
+          context: context
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  # Next candidates, with `needs: release`: a .deb (nfpm) and an AUR -bin
+  # package.

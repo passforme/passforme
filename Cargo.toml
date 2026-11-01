@@ -1,0 +1,34 @@
+[workspace]
+resolver = "3"
+members = ["crates/core", "crates/cli", "crates/server"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.87"
+publish = false
+license = "AGPL-3.0-only"
+repository = "https://github.com/passforme/passforme"
+homepage = "https://passforme.com"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+module_name_repetitions = "allow"
+missing_errors_doc = "allow"
+must_use_candidate = "allow"
+# The panics left are `expect`s on internal invariants, each with its reason.
+missing_panics_doc = "allow"
+
+# The server binary is built on the laptop and copied to the VM: small and stripped.
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+
+# Dependencies optimized even in debug and test builds: Argon2 with the real
+# 256 MiB parameters takes tens of seconds unoptimized.
+[profile.dev.package."*"]
+opt-level = 3

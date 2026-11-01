@@ -1,0 +1,1011 @@
+<!doctype html>
+<html lang="pt-BR" data-title-pt="Guia de comandos · passforme" data-title-en="Command guide · passforme">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Guia de comandos · passforme</title>
+<meta name="description" content="Every passforme command, from daily use to emergencies. / Todos os comandos do passforme, do uso diário à emergência.">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<meta property="og:title" content="passforme · command guide">
+<meta property="og:image" content="https://passforme.com/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preload" href="assets/fonts/bricolage-grotesque-latin-standard-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="assets/site.css">
+<link rel="stylesheet" href="assets/guide.css">
+<script src="assets/site.js" defer></script>
+<script src="assets/guide.js" defer></script>
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="index.html">passforme<span class="alias">pfm</span></a>
+  <nav aria-label="Site">
+    <a href="index.html"><span data-lang="pt">Início</span><span data-lang="en" hidden>Home</span></a>
+    <a href="guide.html" aria-current="page"><span data-lang="pt">Guia</span><span data-lang="en" hidden>Guide</span></a>
+    <a href="brand.html"><span data-lang="pt">Marca</span><span data-lang="en" hidden>Brand</span></a>
+    <a href="https://github.com/passforme" target="_blank" rel="noopener">GitHub</a>
+  </nav>
+  <div class="langs" role="group" aria-label="Idioma / Language">
+    <button type="button" data-set="pt" aria-pressed="true">PT</button>
+    <button type="button" data-set="en" aria-pressed="false">EN</button>
+  </div>
+</header>
+
+<header class="guide-head">
+  <div>
+    <h1 data-lang="pt">Guia de comandos</h1>
+    <h1 data-lang="en" hidden>Command guide</h1>
+    <p class="lede" data-lang="pt">Todos os comandos do seu gerenciador de senhas, do uso diário à emergência. O nome de um item pode ser só um pedaço do título: <code>pfm get conta</code> acha <code>contabo.com</code>.</p>
+    <p class="lede" data-lang="en" lang="en" hidden>Every command of your password manager, from daily use to emergencies. An item's name can be just part of its title: <code>pfm get deep</code> finds <code>deepseek.com</code>.</p>
+  </div>
+  <div class="search">
+    <label for="q"><span data-lang="pt">Procurar comando</span><span data-lang="en" hidden>Find a command</span></label>
+    <input id="q" type="search" placeholder="ex.: cvv, totp, gerar, sessão" autocomplete="off">
+  </div>
+</header>
+
+<div class="wrap" data-lang="pt" lang="pt">
+  <nav class="index" aria-label="Seções">
+    <a href="#comecar">Começar</a>
+    <a href="#diario">Uso diário</a>
+    <a href="#cadastrar">Cadastrar</a>
+    <a href="#tipos">Tipos de item</a>
+    <a href="#alterar">Alterar e apagar</a>
+    <a href="#gerador">Gerador</a>
+    <a href="#sessao">Sessão e segurança</a>
+    <a href="#agente">Agente (programas)</a>
+    <a href="#sync">Sincronização</a>
+    <a href="#emergencia">Emergência</a>
+  </nav>
+
+  <main>
+    <section id="comecar">
+      <h2>Começar</h2>
+      <p class="sub">Uma vez por notebook. O cofre fica em <code>~/.local/share/passforme</code>, cifrado.</p>
+      <div class="cards">
+        <article class="cmd">
+          <h3>pfm init <span class="what">criar o cofre</span></h3>
+          <p>Pede a frase mestra (pelo menos 12 caracteres) e mostra o <strong>Emergency Kit</strong>: a Secret Key, que começa com <code>SB1-</code>. Uma frase de palavras é mais fácil de lembrar que uma senha aleatória, e o gerador sugere uma.</p>
+          <div class="ex">
+            <div class="line"><span class="c">pfm generate --words 7 --lang pt-br  <span class="hash"># sugestão de frase mestra</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm init</span><button type="button">Copiar</button></div>
+          </div>
+          <p class="note">Anote a frase mestra e a Secret Key em papel e guarde longe do notebook. Sem as duas não há recuperação: o cofre é cifrado no seu aparelho, e ninguém mais tem a chave.</p>
+        </article>
+        <article class="cmd">
+          <h3>pfm register URL <span class="what">ligar a um servidor (opcional)</span></h3>
+          <p>Sem servidor, o <code>pfm</code> funciona só neste notebook. Com um <code>passforme-server</code> seu, o cofre sincroniza entre aparelhos, e o servidor só guarda o cofre cifrado. O registro pede um convite de uso único, gerado no servidor.</p>
+          <div class="ex">
+            <div class="line"><span class="c">pfm register https://pfm.example.com</span><button type="button">Copiar</button></div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="diario">
+      <h2>Uso diário</h2>
+      <p class="sub">Copiar, consultar e ver. Tudo o que vai para o clipboard se apaga sozinho em 30 segundos.</p>
+      <div class="cards">
+        <article class="cmd">
+          <h3>Tab <span class="what">completa comandos, opções e tipos</span></h3>
+          <p>Toda opção tem um nome só, por extenso: <code>--username</code>, <code>--generate</code>, <code>--symbols</code>. Para não digitar tudo, use Tab: <code>pfm add x --us</code> + Tab vira <code>--username</code>, e <code>--kind</code> + Tab lista os tipos. Uma forma curta antiga, como <code>-u</code>, responde com o nome novo.</p>
+          <p>Para ligar, acrescente esta linha ao seu <code>~/.bashrc</code>:</p>
+          <div class="ex"><div class="line"><span class="c">source &lt;(passforme completions bash)</span><button type="button">Copiar</button></div></div>
+          <p>Também há scripts para <code>zsh</code>, <code>fish</code>, <code>elvish</code> e <code>powershell</code>:</p>
+          <div class="ex">
+            <div class="line"><span class="c">passforme completions zsh &gt; ~/.zfunc/_passforme  <span class="hash"># zsh</span></span><button type="button">Copiar</button></div>
+          </div>
+        </article>
+        <article class="cmd">
+          <h3>pfm get NOME <span class="what">copiar uma senha</span></h3>
+          <p>Copia o segredo principal do item: a senha de um login, o número de um cartão, o PIN de um PIN.</p>
+          <div class="tbl"><table>
+            <tr><th>Opção</th><th>O que faz</th></tr>
+            <tr><td><code>--field username</code></td><td>copia o usuário</td></tr>
+            <tr><td><code>--field url</code></td><td>copia o endereço</td></tr>
+            <tr><td><code>--field totp</code></td><td>copia o código 2FA de agora</td></tr>
+            <tr><td><code>--field cvv</code>, <code>--field pin</code>, <code>--field number</code>…</td><td>copia um campo pelo nome; um nome errado lista os que existem</td></tr>
+            <tr><td><code>--attachment NOME</code></td><td>salva um anexo no diretório atual, ou onde <code>--output</code> mandar; nunca sobrescreve</td></tr>
+          </table></div>
+          <div class="ex">
+            <div class="line"><span class="c">pfm get contabo</span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm get contabo --field username  <span class="hash"># copia o usuário</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm get contabo --field url  <span class="hash"># copia o endereço</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm get github --field totp  <span class="hash"># copia o código 2FA de agora</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm get nubank --field cvv</span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm get proton-recovery --attachment proton-recovery.txt --output ~/Desktop  <span class="hash"># salva o anexo numa pasta</span></span><button type="button">Copiar</button></div>
+          </div>
+        </article>
+        <article class="cmd">
+          <h3>pfm list <span class="what">ver todos os itens</span></h3>
+          <p>Tabela com título, tipo, usuário, URL e o que mais cada item guarda: campos extras, 2FA, quantos códigos de recuperação restam, quantos arquivos anexados, e se programas podem ler o item. Nunca mostra senhas.</p>
+          <div class="ex">
+            <div class="line"><span class="c">pfm list</span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm list | grep -i kimi  <span class="hash"># filtrar</span></span><button type="button">Copiar</button></div>
+          </div>
+        </article>
+        <article class="cmd">
+          <h3>pfm show NOME <span class="what">ver um item inteiro</span></h3>
+          <p>Todos os campos, com os segredos como <code>********</code>. Com <code>--reveal</code>, mostra os segredos na tela. Os anexos aparecem como <code>Attachment: nome (tamanho)</code>: é ali que você vê o nome exato para o <code>get --attachment</code>.</p>
+          <div class="ex">
+            <div class="line"><span class="c">pfm show nubank  <span class="hash"># segredos escondidos</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm show nubank --reveal  <span class="hash"># segredos na tela</span></span><button type="button">Copiar</button></div>
+          </div>
+
+        </article>
+        <article class="cmd">
+          <h3>pfm totp NOME <span class="what">código 2FA</span></h3>
+          <p>Mostra o código de 6 dígitos de agora e por quantos segundos ele vale. Para copiar: <code>pfm get NOME --field totp</code>. O segredo do 2FA entra com <code>pfm edit NOME --totp</code>.</p>
+          <div class="ex">
+            <div class="line"><span class="c">pfm totp github  <span class="hash"># mostra o código</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm get github --field totp  <span class="hash"># copia o código</span></span><button type="button">Copiar</button></div>
+          </div>
+        </article>
+        <article class="cmd">
+          <h3>pfm codes NOME <span class="what">código de recuperação</span></h3>
+          <p>Copia o próximo código ainda não usado e o marca como usado. Avisa quando restam dois ou menos. Com <code>--list</code>, mostra todos e quais já foram usados (na tela, em texto puro). Para cadastrar os códigos, ver <a href="#codigos">códigos de recuperação</a>.</p>
+          <div class="ex">
+            <div class="line"><span class="c">pfm codes openai  <span class="hash"># copia o próximo e marca como usado</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm codes openai --list  <span class="hash"># todos, com (used) nos usados</span></span><button type="button">Copiar</button></div>
+          </div>
+          <p class="note">Não há como desmarcar um código: rode <code>pfm codes</code> só na hora de usar. Marcar ao copiar é o lado seguro do erro: no pior caso sobra um código a menos, e nunca um já gasto volta para a lista. Se precisar refazer a lista, cole os códigos de novo com <code>pfm edit NOME --codes</code>.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="cadastrar">
+      <h2>Cadastrar</h2>
+      <p class="sub">Uma senha nova gerada na hora, uma senha que já existe, ou várias de uma vez.</p>
+      <div class="cards">
+        <article class="cmd">
+          <h3>pfm add NOME <span class="what">cadastrar um item</span></h3>
+          <p>Sem <code>--generate</code>, pede a senha duas vezes, para conferir. Use assim para guardar uma senha que você não quer trocar.</p>
+          <div class="tbl"><table>
+            <tr><th>Opção</th><th>O que faz</th></tr>
+            <tr><td><code>--username USUÁRIO</code></td><td>usuário ou e-mail da conta</td></tr>
+            <tr><td><code>--url ENDEREÇO</code></td><td>endereço do site; repita para vários</td></tr>
+            <tr><td><code>--generate</code></td><td>gera uma senha nova, salva e copia</td></tr>
+            <tr><td><code>--kind TIPO</code></td><td>o tipo do item (ver <a href="#tipos">Tipos</a>); sem ele, é um login</td></tr>
+            <tr><td><code>--file ARQUIVO</code></td><td>lê o segredo de um arquivo, como uma chave SSH</td></tr>
+            <tr><td><code>--agent</code></td><td>deixa programas (scripts, agentes de IA) lerem o item (ver <a href="#agente">Agente</a>)</td></tr>
+          </table></div>
+          <p>Com <code>--generate</code> valem as opções do <a href="#gerador">gerador</a>: <code>--symbols</code>, <code>--length 16</code>, <code>--words 6</code>… Sem <code>--generate</code>, elas dão erro, em vez de serem ignoradas.</p>
+          <div class="ex">
+            <div class="line"><span class="c">pfm add contabo.com --username root --url https://contabo.com --generate  <span class="hash"># conta nova</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm add roteador --username admin --url http://192.168.1.1  <span class="hash"># senha que já existe</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm add banco.com --generate --symbols  <span class="hash"># com símbolos</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm add app.com --generate --length 16  <span class="hash"># site que limita o tamanho</span></span><button type="button">Copiar</button></div>
+          </div>
+        </article>
+        <article class="cmd">
+          <h3>pfm add-many <span class="what">várias de uma vez</span></h3>
+          <p>Pede label, senha, label, senha… até um Enter vazio. A frase mestra é pedida uma vez e cada item é salvo na hora: parar no meio não perde nada. A senha colada não aparece na tela. Bom para trazer senhas de outro gerenciador; depois complete cada item com <code>pfm edit</code>.</p>
+          <div class="ex">
+            <div class="line"><span class="c">pfm add-many  <span class="hash"># Label: github.com, a senha, Label: … Enter vazio termina</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm edit github.com --username voce@exemplo.com --url https://github.com  <span class="hash"># completar depois</span></span><button type="button">Copiar</button></div>
+          </div>
+        </article>
+        <article class="cmd">
+          <h3>Login sem senha <span class="what">código por SMS, entrar com Google</span></h3>
+          <p>Para o site que entra pelo celular ou pela conta Google, cadastre sem <code>--generate</code> e, quando ele pedir o segredo, aperte <strong>Enter sem digitar nada</strong>: o item fica sem senha. Vale cadastrar mesmo assim, porque daqui a um ano o difícil é lembrar <em>como</em> você entrava.</p>
+          <ul>
+            <li><code>--username</code>: o número de celular ou o e-mail usado. No login pelo Google, o e-mail da conta Google, porque com várias contas é fácil esquecer qual foi.</li>
+            <li><strong>Notas</strong>: o método ("login com Google", "código por SMS"). O <code>add</code> não tem opção de notas: acrescente com <code>pfm edit NOME --notes</code> e termine o texto com Ctrl-D numa linha vazia.</li>
+            <li><strong>Códigos de recuperação</strong>: se o site tiver 2FA e oferecer códigos de backup, guarde-os num item próprio do tipo <code>recovery-codes</code>.</li>
+            <li>Se um dia o site passar a pedir senha, gere uma no item que já existe com <code>pfm edit NOME --generate</code>.</li>
+          </ul>
+          <div class="ex">
+            <div class="line"><span class="c">pfm add ifood.com.br --username "+55 51 9xxxx-xxxx" --url https://ifood.com.br  <span class="hash"># Enter vazio no segredo</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm edit ifood --notes  <span class="hash"># escreva o método; Ctrl-D termina</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm add "ifood codes" --kind recovery-codes  <span class="hash"># códigos de backup do 2FA</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm edit ifood --generate  <span class="hash"># se passar a pedir senha</span></span><button type="button">Copiar</button></div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="tipos">
+      <h2>Tipos de item</h2>
+      <p class="sub"><code>pfm add NOME --kind TIPO</code> pergunta os campos do tipo, um por vez; Enter pula o campo. <code>pfm kinds</code> lista os tipos no terminal. <code>--username</code>, <code>--url</code> e <code>--file</code> só valem nos tipos que têm esse campo, e <code>--generate</code> só em <code>login</code>, <code>wifi</code> e <code>bank</code>, cujo segredo é uma senha: um PIN, um cartão ou uma frase de cripto gerados não fariam sentido.</p>
+      <div class="cards">
+        <article class="cmd">
+          <div class="tbl"><table>
+            <tr><th>Tipo</th><th>Para quê</th><th><code>get</code> copia</th></tr>
+            <tr><td><code>login</code> (padrão)</td><td>site ou app: usuário, senha, URLs, 2FA</td><td>a senha</td></tr>
+            <tr><td><code>note</code></td><td>texto livre</td><td>—</td></tr>
+            <tr><td><code>recovery-codes</code></td><td>códigos de backup; um por linha ao colar, linha vazia termina (<a href="#codigos">exemplos</a>)</td><td>use <code>pfm codes</code></td></tr>
+            <tr><td><code>recovery-phrase</code></td><td>frase de recuperação de uma conta (Proton…); confere o BIP-39 quando for um</td><td>as palavras</td></tr>
+            <tr><td><code>security-questions</code></td><td>perguntas e respostas de segurança</td><td><code>--field "a pergunta"</code></td></tr>
+            <tr><td><code>pin</code></td><td>celular, alarme, cadeado</td><td>o PIN</td></tr>
+            <tr><td><code>api-key</code></td><td>chave de API ou token: o nome dela no site, a validade</td><td>a chave</td></tr>
+            <tr><td><code>crypto-seed</code></td><td>frase da carteira; confere o checksum do BIP-39</td><td>as palavras</td></tr>
+            <tr><td><code>ssh-key</code></td><td>chave SSH ou GPG, lida com <code>--file</code></td><td>a chave privada</td></tr>
+            <tr><td><code>card</code></td><td>titular, número (confere o dígito), validade MM/AA, CVV, PIN</td><td>o número</td></tr>
+            <tr><td><code>bank</code></td><td>agência, conta, senhas do app e de transação, chave Pix</td><td>a senha do app</td></tr>
+            <tr><td><code>wifi</code></td><td>rede e senha</td><td>a senha</td></tr>
+            <tr><td><code>license</code></td><td>chave de licença de software</td><td>a chave</td></tr>
+            <tr><td><code>document</code></td><td>CPF, RG, passaporte: número, datas, emissor</td><td>o número</td></tr>
+          </table></div>
+          <div class="ex">
+            <div class="line"><span class="c">pfm add nubank --kind card</span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm add google-codes --kind recovery-codes</span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm add ledger --kind crypto-seed</span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm add ssh-github --kind ssh-key --file ~/.ssh/id_ed25519</span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm add "celular pin" --kind pin</span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm add "wifi casa" --kind wifi --generate  <span class="hash"># a senha da rede, gerada</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm add itau --kind bank</span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm add cpf --kind document</span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm add "gov.br perguntas" --kind security-questions  <span class="hash"># pergunta → resposta, até uma pergunta vazia</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm add "anotações servidor" --kind note  <span class="hash"># texto livre; Ctrl-D numa linha vazia termina</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm add jetbrains --kind license</span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm kinds  <span class="hash"># lista os tipos e os campos de cada um</span></span><button type="button">Copiar</button></div>
+          </div>
+          <p class="note">Frase de cripto e número de cartão são conferidos na hora. Se houver palavra trocada ou dígito errado, o <code>pfm</code> avisa e pergunta antes de salvar, enquanto o papel ainda está na sua mão.</p>
+        </article>
+        <article class="cmd">
+          <h3>pfm add NOME --kind api-key <span class="what">guardar uma chave de API</span></h3>
+          <p>O <code>add</code> pergunta um campo por vez, nesta ordem, e Enter pula qualquer um. O <strong>Key name já é perguntado aqui</strong>: não precisa de <code>--set-field</code>. A conta e a URL também podem ir no comando, com <code>--username</code> e <code>--url</code>, e aí ele pergunta só o resto.</p>
+          <div class="tbl"><table>
+            <tr><th>Campo</th><th>O que vai nele</th></tr>
+            <tr><td>Account</td><td>a conta da qual a chave saiu, em geral o e-mail. É o username do item, com outro nome. Se a chave vazar, ele diz em qual conta revogá-la.</td></tr>
+            <tr><td>Key name</td><td>o nome que você deu à chave no site, como <code>meu-notebook</code>: com várias chaves na mesma conta, diz qual revogar</td></tr>
+            <tr><td>Key</td><td>a chave, colada; não aparece na tela</td></tr>
+            <tr><td>URL</td><td>o painel onde a chave foi criada</td></tr>
+            <tr><td>Expires</td><td>a validade; vazio se não expira</td></tr>
+          </table></div>
+          <p>Com <code>--agent</code>, programas (scripts, agentes de IA) podem ler a chave (ver <a href="#agente">Agente</a>). Use só se um programa vai ler a chave; para copiar e colar você mesmo, deixe sem, e ela nunca passa pelo agente. Na configuração deles, use o <strong>título inteiro</strong>: <code>deepseek</code> casaria também com o login <code>deepseek.com</code>.</p>
+          <div class="ex">
+            <div class="line"><span class="c">pfm add "deepseek api key" --kind api-key  <span class="hash"># pergunta conta, Key name, chave, URL, validade</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm add "deepseek api key" --kind api-key --username voce@exemplo.com --url https://platform.deepseek.com  <span class="hash"># conta e URL no comando</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm add "deepseek api key" --kind api-key --agent  <span class="hash"># chave que um programa vai ler</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm get "deepseek api key"  <span class="hash"># copia a chave</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm get "deepseek api key" --field account  <span class="hash"># copia o e-mail da conta</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm edit "deepseek api key" --password  <span class="hash"># trocar por uma chave nova</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm edit "deepseek api key" --set-field "Key name"  <span class="hash"># mudar o nome depois, ou num item criado antes do campo existir</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm get "deepseek api key" --field "key name"  <span class="hash"># copia só o nome</span></span><button type="button">Copiar</button></div>
+          </div>
+          <p class="note">Várias chaves na mesma conta: um item por chave, com o nome dela também no título, como <code>deepseek api key notebook</code> e <code>deepseek api key servidor</code>. Assim o <code>get</code>, o <code>list</code> e a configuração dos programas diferenciam uma da outra só pelo título.</p>
+        </article>
+        <article class="cmd">
+          <h3>Um serviço, vários logins <span class="what">um item para cada login</span></h3>
+          <p>Alguns serviços têm um login para o app e outro para a API, como o Kimi: o chat em <code>kimi.ai</code> entra pelo telefone, e a plataforma de API em <code>platform.kimi.ai</code> entra por e-mail ou Google. Cadastre um item para cada login, cada um com o seu username, e a chave num terceiro item.</p>
+          <p>Com vários itens começando por "kimi", <code>pfm get kimi</code> responde <em>"matches several items"</em> e lista os itens. Use o título exato, que sempre ganha, ou um pedaço que só um título tenha.</p>
+          <div class="ex">
+            <div class="line"><span class="c">pfm add kimi.ai --username "+55 47 9xxxx-xxxx" --url https://kimi.ai  <span class="hash"># chat, código por SMS</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm add platform.kimi.ai --username seu@email.com --url https://platform.kimi.ai  <span class="hash"># API, código por e-mail</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm add "kimi api key" --kind api-key  <span class="hash"># a chave</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm show kimi.ai  <span class="hash"># título exato</span></span><button type="button">Copiar</button></div>
+          </div>
+        </article>
+        <article class="cmd">
+          <h3>Várias contas no mesmo serviço <span class="what">um item por conta</span></h3>
+          <p>Duas contas no Zoho, no Google ou na AWS são dois itens, cada um com o seu usuário e a sua senha. Ponha no título o que diferencia uma da outra (pessoal, trabalho, o domínio), para o <code>get</code> achar a certa.</p>
+          <div class="ex">
+            <div class="line"><span class="c">pfm add "zoho.com pessoal" --username voce@exemplo.com --url https://www.zoho.com --generate</span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm add "zoho.com empresa" --username admin@empresa.com --url https://www.zoho.com --generate</span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm get "zoho.com empresa"  <span class="hash"># título exato</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm get empresa  <span class="hash"># ou um pedaço que só ele tem</span></span><button type="button">Copiar</button></div>
+          </div>
+        </article>
+        <article class="cmd">
+          <h3>Um login, mais de um e-mail <span class="what">campos extras</span></h3>
+          <p>Se é o <strong>mesmo login, com a mesma senha</strong>, e a conta tem outros e-mails (o de cadastro, um alias, o de recuperação), o <code>--username</code> fica com o que você digita para entrar, e os outros vão em campos extras. O nome do campo é livre: <code>Alias</code>, <code>Signup email</code>, <code>Recovery email</code>, o que fizer sentido para você.</p>
+          <p>Campos extras só existem no <code>edit</code>: cadastre primeiro, acrescente depois. Se o outro e-mail entra com <strong>outra senha</strong>, é outro login, e vira outro item.</p>
+          <div class="ex">
+            <div class="line"><span class="c">pfm add "zoho.com empresa" --username voce@empresa.com --url https://www.zoho.com --generate  <span class="hash"># o e-mail com que você entra</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm edit "zoho.com empresa" --set-field "Signup email"  <span class="hash"># pergunta o valor, visível</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm get "zoho.com empresa" --field "signup email"  <span class="hash"># copia o campo</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm edit "zoho.com empresa" --rm-field "Signup email"  <span class="hash"># remove o campo</span></span><button type="button">Copiar</button></div>
+          </div>
+        </article>
+        <article class="cmd" id="codigos">
+          <h3>pfm add NOME --kind recovery-codes <span class="what">códigos de recuperação e o arquivo</span></h3>
+          <p>Os códigos de backup do 2FA (OpenAI, GitHub, Google…). O tipo pergunta a conta e a URL, que também podem vir no comando, e então os códigos: cole todos, <strong>um por linha</strong>, e termine com uma <strong>linha vazia</strong>. Código com espaço no meio vale. Não aparecem na tela.</p>
+          <p>Se o site deu um arquivo com os códigos, anexe-o com <code>edit --attach</code>, como cópia do original. Mesmo assim os códigos ficam no item, porque o <code>pfm codes</code> usa os do item.</p>
+          <div class="ex">
+            <div class="line"><span class="c">pfm add "openai recovery codes" --kind recovery-codes --username voce@exemplo.com --url https://openai.com  <span class="hash"># cole, linha vazia termina</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm edit "openai recovery codes" --attach ~/Downloads/openai-recovery-codes.txt  <span class="hash"># guarda o arquivo</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm codes openai  <span class="hash"># na hora de usar: copia um</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm codes openai --list  <span class="hash"># quais restam</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm get "openai recovery codes" --attachment openai-recovery-codes.txt --output ~/Desktop  <span class="hash"># devolve o arquivo</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm edit github --codes  <span class="hash"># códigos dentro de um login, ou trocar por um lote novo</span></span><button type="button">Copiar</button></div>
+          </div>
+          <p class="note">Gerou códigos novos no site? <code>pfm edit NOME --codes --attach ARQUIVO_NOVO</code> troca os códigos e anexa o arquivo novo; <code>--rm-attachment</code> tira o antigo. Depois apague o arquivo de <code>~/Downloads</code>.</p>
+        </article>
+        <article class="cmd">
+          <h3>pfm add NOME --kind recovery-phrase <span class="what">frase e arquivo de recuperação</span></h3>
+          <p>Serviços como o Proton dão uma <strong>frase de recuperação</strong> (12 palavras) e às vezes um <strong>arquivo de recuperação</strong>. O tipo <code>recovery-phrase</code> pergunta a conta, a URL e as palavras. Se a frase tem o tamanho de uma frase BIP-39 (12, 15, 18, 21 ou 24 palavras), o <code>pfm</code> a confere: uma palavra trocada ou digitada errada aparece na hora. Frases de outro formato são guardadas como foram digitadas.</p>
+          <p>O arquivo vai como <strong>anexo</strong>, cifrado dentro do item, com <code>edit --attach</code>. Os anexos de um item somam no máximo 512 KiB: o cofre inteiro viaja a cada sincronização, então só cabem arquivos pequenos.</p>
+          <div class="ex">
+            <div class="line"><span class="c">pfm add proton-recovery --kind recovery-phrase  <span class="hash"># conta, URL e as 12 palavras</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm edit proton-recovery --attach ~/Downloads/proton-recovery.txt  <span class="hash"># guarda o arquivo no item</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm get proton-recovery  <span class="hash"># copia as palavras</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm get proton-recovery --attachment proton-recovery.txt --output ~/Downloads  <span class="hash"># devolve o arquivo</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm edit proton-recovery --rm-attachment proton-recovery.txt  <span class="hash"># remove o anexo</span></span><button type="button">Copiar</button></div>
+          </div>
+          <p class="note">O <code>get --attachment</code> nunca sobrescreve um arquivo e grava legível só por você. Depois de guardar o arquivo no <code>pfm</code>, apague a cópia de <code>~/Downloads</code>.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="alterar">
+      <h2>Alterar e apagar</h2>
+      <div class="cards">
+        <article class="cmd">
+          <h3>pfm edit NOME <span class="what">mudar um item</span></h3>
+          <p>Muda só o que você pedir; a senha continua a mesma, a menos que use <code>--generate</code> ou <code>--password</code>.</p>
+          <div class="tbl"><table>
+            <tr><th>Opção</th><th>O que faz</th></tr>
+            <tr><td><code>--title NOVO</code></td><td>renomeia</td></tr>
+            <tr><td><code>--username USUÁRIO</code></td><td>troca o usuário</td></tr>
+            <tr><td><code>--url</code> / <code>--rm-url</code></td><td>acrescenta / remove um endereço</td></tr>
+            <tr><td><code>--password</code></td><td>digita uma senha nova</td></tr>
+            <tr><td><code>--generate</code></td><td>gera uma senha nova e copia; só em itens <code>login</code>, <code>wifi</code> e <code>bank</code></td></tr>
+            <tr><td><code>--totp</code></td><td>cola o segredo do 2FA (texto ou link <code>otpauth://</code>)</td></tr>
+            <tr><td><code>--notes</code></td><td>escreve notas; termina com Ctrl+D</td></tr>
+            <tr><td><code>--set-field NOME</code></td><td>cria ou troca um campo visível</td></tr>
+            <tr><td><code>--set-secret-field NOME</code></td><td>cria ou troca um campo oculto</td></tr>
+            <tr><td><code>--rm-field NOME</code></td><td>remove um campo</td></tr>
+            <tr><td><code>--codes</code></td><td>substitui os códigos de recuperação</td></tr>
+            <tr><td><code>--attach ARQUIVO</code></td><td>guarda um arquivo pequeno no item; um de mesmo nome é substituído</td></tr>
+            <tr><td><code>--rm-attachment NOME</code></td><td>remove um anexo</td></tr>
+            <tr><td><code>--kind TIPO</code></td><td>muda o tipo, sem perder dados</td></tr>
+            <tr><td><code>--agent</code> / <code>--no-agent</code></td><td>liga ou desliga o acesso de programas</td></tr>
+          </table></div>
+          <div class="ex">
+            <div class="line"><span class="c">pfm edit deepseek --url https://chat.deepseek.com --url https://deepseek.com  <span class="hash"># endereços num item que já existe; a senha fica</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm edit contabo --generate  <span class="hash"># trocou a senha no site</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm edit github --totp  <span class="hash"># ativou o 2FA</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm edit alarme --kind pin</span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm edit contabo --title contabo.com  <span class="hash"># renomeia</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm edit contabo --username novo@exemplo.com  <span class="hash"># troca o usuário</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm edit deepseek --rm-url https://deepseek.com  <span class="hash"># remove um endereço</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm edit roteador --password  <span class="hash"># digita a senha nova, duas vezes</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm edit contabo --generate --symbols --length 20  <span class="hash"># gera com as regras do site</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm edit ifood --notes  <span class="hash"># notas; Ctrl-D numa linha vazia termina, vazio apaga</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm edit nubank --set-secret-field "Senha do app"  <span class="hash"># campo oculto, digitado sem eco</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm edit nubank --rm-field "Senha do app"  <span class="hash"># remove o campo</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm edit "deepseek api key" --agent  <span class="hash"># programas podem ler; --no-agent desfaz</span></span><button type="button">Copiar</button></div>
+          </div>
+        </article>
+        <article class="cmd" id="anexos">
+          <h3>Anexos <span class="what">arquivos pequenos dentro de um item</span></h3>
+          <p>Arquivo de recuperação, códigos em <code>.txt</code>, um PDF com as palavras: <code>edit --attach</code> guarda o arquivo dentro do item, e <code>get --attachment</code> devolve. Até 512 KiB somando os anexos de um item; um anexo com o mesmo nome substitui o anterior.</p>
+          <p><strong>O anexo é cifrado sempre</strong>, junto com o resto do item: no cofre do notebook, no <code>.bak</code>, no servidor e no histórico dele, e na sincronização. Programas (o agente) nunca recebem anexos. Ele só fica em texto puro em dois lugares, os dois por ação sua: o arquivo original, até você apagar, e a cópia que o <code>get --attachment</code> grava (legível só por você, nunca sobrescreve nada). O servidor vê só o tamanho aproximado do item, nunca o conteúdo nem o nome do arquivo.</p>
+          <div class="ex">
+            <div class="line"><span class="c">pfm edit proton-recovery --attach ~/Downloads/proton-recovery.pdf  <span class="hash"># anexa</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm edit proton-recovery --attach a.txt --attach b.txt  <span class="hash"># vários de uma vez</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm show proton-recovery  <span class="hash"># lista: Attachment: nome (tamanho)</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm get proton-recovery --attachment proton-recovery.pdf  <span class="hash"># salva na pasta atual</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm get proton-recovery --attachment proton-recovery.pdf --output ~/proton.pdf  <span class="hash"># salva com outro nome</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm edit proton-recovery --rm-attachment proton-recovery.pdf  <span class="hash"># remove</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">rm ~/Downloads/proton-recovery.pdf  <span class="hash"># depois de anexar, apague o original</span></span><button type="button">Copiar</button></div>
+          </div>
+        </article>
+        <article class="cmd">
+          <h3>pfm rm NOME <span class="what">apagar um item</span></h3>
+          <p>Pede para digitar o título de volta, para confirmar. Com o cofre sincronizado, o item some também dos outros aparelhos.</p>
+          <div class="ex">
+            <div class="line"><span class="c">pfm rm roteador  <span class="hash"># digite o título para confirmar</span></span><button type="button">Copiar</button></div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="gerador">
+      <h2>Gerador</h2>
+      <p class="sub">O padrão é o estilo Contabo: 29 letras e números, 173 bits. Nada que quebre num formulário, e um clique duplo seleciona tudo.</p>
+      <div class="cards">
+        <article class="cmd">
+          <h3>pfm generate <span class="what">só gerar, sem salvar</span></h3>
+          <div class="tbl"><table>
+            <tr><th>Opção</th><th>O que faz</th></tr>
+            <tr><td><code>--symbols</code></td><td>com símbolos</td></tr>
+            <tr><td><code>--length N</code></td><td>tamanho, de 4 a 1024</td></tr>
+            <tr><td><code>--no-digits</code>, <code>--no-uppercase</code>, <code>--no-lowercase</code></td><td>tira números, maiúsculas ou minúsculas</td></tr>
+            <tr><td><code>--avoid-ambiguous</code></td><td>tira os caracteres que se confundem: l, 1, O, 0</td></tr>
+            <tr><td><code>--words N</code></td><td>frase de N palavras em vez de caracteres</td></tr>
+            <tr><td><code>--lang pt-br</code>, <code>--lang en</code></td><td>idioma das palavras; só com <code>--words</code></td></tr>
+            <tr><td><code>--separator X</code></td><td>o que vai entre as palavras (padrão <code>-</code>); só com <code>--words</code></td></tr>
+            <tr><td><code>--copy</code></td><td>copia em vez de mostrar</td></tr>
+          </table></div>
+          <div class="ex">
+            <div class="line"><span class="c">pfm generate  <span class="hash"># Tguod41e8MFOYKBFPF30bSxnxeIkE</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm generate --words 6 --lang pt-br  <span class="hash"># pedestre-vareta-enxuto-…</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm generate --length 6 --no-lowercase --no-uppercase  <span class="hash"># PIN de 6 dígitos</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm generate --symbols --length 20  <span class="hash"># site que exige símbolo e limita a 20</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm generate --avoid-ambiguous  <span class="hash"># para ler e digitar à mão</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm generate --words 5 --separator " "  <span class="hash"># palavras separadas por espaço</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm generate --copy  <span class="hash"># copia sem mostrar na tela</span></span><button type="button">Copiar</button></div>
+          </div>
+          <p class="note">Nenhuma opção é ignorada: se uma não fizer sentido no comando, o <code>pfm</code> recusa antes de pedir qualquer coisa. Frase e caracteres não se misturam: <code>--words</code> não aceita <code>--length</code>, <code>--symbols</code>, <code>--no-…</code> nem <code>--avoid-ambiguous</code>. No <code>add</code> e no <code>edit</code>, todas as opções do gerador precisam de <code>--generate</code>.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="sessao">
+      <h2>Sessão e segurança</h2>
+      <div class="cards">
+        <article class="cmd">
+          <h3>Sessão <span class="what">automática</span></h3>
+          <p>Digitou a frase mestra uma vez, os próximos comandos não pedem de novo. Trava em 15 minutos sem uso, quando a tela bloqueia, quando o notebook suspende, ou com <code>pfm lock</code>. Só vale para comandos digitados no terminal.</p>
+          <p>Para mudar o tempo, crie <code>~/.config/passforme/config</code> com uma linha:</p>
+          <div class="ex">
+            <div class="line"><span class="c">session = 1h  <span class="hash"># ou 30m; "off" pede a frase sempre</span></span><button type="button">Copiar</button></div>
+          </div>
+        </article>
+        <article class="cmd">
+          <h3>pfm lock <span class="what">travar agora</span></h3>
+          <p>Fecha a sessão e esvazia o agente. Bom antes de emprestar o notebook ou sair de perto.</p>
+          <div class="ex">
+            <div class="line"><span class="c">pfm lock</span><button type="button">Copiar</button></div>
+          </div>
+        </article>
+        <article class="cmd">
+          <h3>pfm status <span class="what">ver o estado</span></h3>
+          <p>Se a sessão está aberta e por quanto tempo, se o agente está ativo e com quais itens, e o servidor de sincronização. Não recebe nome de item.</p>
+          <div class="ex">
+            <div class="line"><span class="c">pfm status</span><button type="button">Copiar</button></div>
+          </div>
+        </article>
+        <article class="cmd">
+          <h3>pfm passwd <span class="what">trocar a frase mestra</span></h3>
+          <p>Recifra o cofre com uma chave nova. A Secret Key continua a mesma. Anote a frase nova no Emergency Kit. Com servidor, os outros aparelhos pedem a frase nova na próxima sincronização.</p>
+          <div class="ex">
+            <div class="line"><span class="c">pfm passwd  <span class="hash"># frase atual, depois a nova duas vezes</span></span><button type="button">Copiar</button></div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="agente">
+      <h2>Agente (programas)</h2>
+      <p class="sub">Programas (scripts, agentes de IA) não usam a sessão. Eles só leem os itens que você marcar, e nada mais do cofre.</p>
+      <div class="cards">
+        <article class="cmd">
+          <div class="tbl"><table>
+            <tr><th>Comando</th><th>O que faz</th></tr>
+            <tr><td><code>pfm edit openrouter --agent</code></td><td>marca o item para programas</td></tr>
+            <tr><td><code>pfm unlock</code></td><td>entrega os itens marcados ao agente por 8 horas</td></tr>
+            <tr><td><code>pfm unlock --for forever</code></td><td>até travar, reiniciar ou sair da sessão</td></tr>
+            <tr><td><code>pfm unlock --for 2h gemini</code></td><td>só os itens citados, pelo tempo dado</td></tr>
+            <tr><td><code>pfm get NOME --stdout</code></td><td>o que o programa chama para ler o valor</td></tr>
+          </table></div>
+          <div class="ex">
+            <div class="line"><span class="c">pfm edit "deepseek api key" --agent  <span class="hash"># 1. marcar</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm unlock --for 8h  <span class="hash"># 2. liberar, com a frase mestra</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm get "deepseek api key" --stdout  <span class="hash"># 3. o que o programa roda</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">DEEPSEEK_API_KEY="$(pfm get 'deepseek api key' --stdout)" ./meu-script  <span class="hash"># num script</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm status  <span class="hash"># o que o agente guarda e por quanto tempo</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm lock  <span class="hash"># esvazia o agente agora</span></span><button type="button">Copiar</button></div>
+          </div>
+          <p class="note">Sem agente liberado, o <code>get --stdout</code> fora de um terminal falha na hora, em vez de ficar esperando uma frase que ninguém vai digitar.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="sync">
+      <h2>Sincronização</h2>
+      <p class="sub">Acontece sozinha a cada <code>add</code>, <code>edit</code>, <code>rm</code> e <code>codes</code>. Se o servidor estiver fora do ar, a mudança fica no notebook e sobe na próxima vez. O servidor só guarda o cofre cifrado.</p>
+      <div class="cards">
+        <article class="cmd">
+          <div class="tbl"><table>
+            <tr><th>Comando</th><th>Quando usar</th></tr>
+            <tr><td><code>pfm sync</code></td><td>forçar a troca com o servidor</td></tr>
+            <tr><td><code>pfm register URL</code></td><td>ligar o cofre a um servidor vazio</td></tr>
+            <tr><td><code>pfm init</code></td><td>criar um cofre novo</td></tr>
+          </table></div>
+          <div class="ex">
+            <div class="line"><span class="c">pfm sync  <span class="hash"># depois de mudar algo em outro aparelho</span></span><button type="button">Copiar</button></div>
+            <div class="line"><span class="c">pfm status  <span class="hash"># mostra a qual servidor está ligado</span></span><button type="button">Copiar</button></div>
+          </div>
+          <p class="note">Item editado nos dois aparelhos ao mesmo tempo: fica a versão do servidor e a sua vira <code>"título (conflict)"</code>. Nada digitado se perde.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="emergencia">
+      <h2>Emergência</h2>
+      <p class="sub">Notebook quebrou, foi roubado ou trocou? O cofre volta inteiro do seu servidor, com o Emergency Kit.</p>
+      <div class="cards">
+        <article class="cmd">
+          <h3>pfm login URL <span class="what">configurar um aparelho novo</span></h3>
+          <p>Pede a Secret Key (começa com <code>SB1-</code>) e a frase mestra, as duas do Emergency Kit, e baixa o cofre.</p>
+          <div class="ex">
+            <div class="line"><span class="c">pfm login https://pfm.example.com</span><button type="button">Copiar</button></div>
+          </div>
+          <p class="note">Sem a Secret Key e a frase não há recuperação: nem o servidor consegue abrir o cofre. Por isso o Emergency Kit fica em papel, guardado longe do notebook.</p>
+        </article>
+      </div>
+    </section>
+
+    <p class="empty" hidden>Nenhum comando com esse termo.</p>
+  </main>
+</div>
+
+<div class="wrap" data-lang="en" lang="en" hidden>
+  <nav class="index" aria-label="Sections">
+    <a href="#start-en">Getting started</a>
+    <a href="#daily-en">Daily use</a>
+    <a href="#add-en">Adding</a>
+    <a href="#kinds-en">Kinds of item</a>
+    <a href="#edit-en">Editing and deleting</a>
+    <a href="#generator-en">Generator</a>
+    <a href="#session-en">Session and security</a>
+    <a href="#agent-en">Agent (programs)</a>
+    <a href="#sync-en">Sync</a>
+    <a href="#emergency-en">Emergency</a>
+  </nav>
+
+  <main>
+    <section id="start-en">
+      <h2>Getting started</h2>
+      <p class="sub">Once per laptop. The vault lives in <code>~/.local/share/passforme</code>, encrypted.</p>
+      <div class="cards">
+        <article class="cmd">
+          <h3>pfm init <span class="what">create the vault</span></h3>
+          <p>Asks for the master phrase (at least 12 characters) and shows the <strong>Emergency Kit</strong>: the Secret Key, which starts with <code>SB1-</code>. A phrase of words is easier to remember than a random password, and the generator suggests one.</p>
+          <div class="ex">
+            <div class="line"><span class="c">pfm generate --words 6 --lang en  <span class="hash"># a master phrase suggestion</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm init</span><button type="button">Copy</button></div>
+          </div>
+          <p class="note">Write the master phrase and the Secret Key on paper and keep it away from the laptop. Without both there is no recovery: the vault is encrypted on your device, and nobody else has the key.</p>
+        </article>
+        <article class="cmd">
+          <h3>pfm register URL <span class="what">link to a server (optional)</span></h3>
+          <p>Without a server, <code>pfm</code> works on this laptop only. With your own <code>passforme-server</code>, the vault syncs between devices, and the server keeps only the encrypted vault. Registering takes a single-use invite, made on the server.</p>
+          <div class="ex">
+            <div class="line"><span class="c">pfm register https://pfm.example.com</span><button type="button">Copy</button></div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="daily-en">
+      <h2>Daily use</h2>
+      <p class="sub">Copy, look up, view. Anything copied to the clipboard is cleared by itself after 30 seconds.</p>
+      <div class="cards">
+        <article class="cmd">
+          <h3>Tab <span class="what">completes commands, options and kinds</span></h3>
+          <p>Every option has a single, spelled-out name: <code>--username</code>, <code>--generate</code>, <code>--symbols</code>. To avoid typing it all, press Tab: <code>pfm add x --us</code> + Tab becomes <code>--username</code>, and <code>--kind</code> + Tab lists the kinds. An old short form such as <code>-u</code> answers with its new name.</p>
+          <p>To turn it on, add this line to your <code>~/.bashrc</code>:</p>
+          <div class="ex"><div class="line"><span class="c">source &lt;(passforme completions bash)</span><button type="button">Copy</button></div></div>
+          <p>There are scripts for <code>zsh</code>, <code>fish</code>, <code>elvish</code> and <code>powershell</code> too:</p>
+          <div class="ex">
+            <div class="line"><span class="c">passforme completions zsh &gt; ~/.zfunc/_passforme  <span class="hash"># zsh</span></span><button type="button">Copy</button></div>
+          </div>
+        </article>
+        <article class="cmd">
+          <h3>pfm get NAME <span class="what">copy a password</span></h3>
+          <p>Copies the item's main secret: a login's password, a card's number, a PIN's PIN.</p>
+          <div class="tbl"><table>
+            <tr><th>Option</th><th>What it does</th></tr>
+            <tr><td><code>--field username</code></td><td>copies the username</td></tr>
+            <tr><td><code>--field url</code></td><td>copies the address</td></tr>
+            <tr><td><code>--field totp</code></td><td>copies the current 2FA code</td></tr>
+            <tr><td><code>--field cvv</code>, <code>--field pin</code>, <code>--field number</code>…</td><td>copies a field by name; a wrong name lists the ones that exist</td></tr>
+            <tr><td><code>--attachment NAME</code></td><td>saves an attachment in the current directory, or where <code>--output</code> says; never overwrites</td></tr>
+          </table></div>
+          <div class="ex">
+            <div class="line"><span class="c">pfm get contabo</span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm get contabo --field username  <span class="hash"># copies the username</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm get contabo --field url  <span class="hash"># copies the address</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm get github --field totp  <span class="hash"># copies the current 2FA code</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm get visa --field cvv</span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm get proton-recovery --attachment proton-recovery.txt --output ~/Desktop  <span class="hash"># saves the attachment in a folder</span></span><button type="button">Copy</button></div>
+          </div>
+        </article>
+        <article class="cmd">
+          <h3>pfm list <span class="what">see every item</span></h3>
+          <p>A table with title, kind, username, URL and what else each item holds: extra fields, 2FA, how many recovery codes are left, how many files are attached, and whether programs may read it. Never shows passwords.</p>
+          <div class="ex">
+            <div class="line"><span class="c">pfm list</span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm list | grep -i kimi  <span class="hash"># filter</span></span><button type="button">Copy</button></div>
+          </div>
+        </article>
+        <article class="cmd">
+          <h3>pfm show NAME <span class="what">see a whole item</span></h3>
+          <p>Every field, with secrets as <code>********</code>. With <code>--reveal</code>, the secrets are shown on screen. Attachments show as <code>Attachment: name (size)</code>: that is where you find the exact name for <code>get --attachment</code>.</p>
+          <div class="ex">
+            <div class="line"><span class="c">pfm show visa  <span class="hash"># secrets hidden</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm show visa --reveal  <span class="hash"># secrets on screen</span></span><button type="button">Copy</button></div>
+          </div>
+
+        </article>
+        <article class="cmd">
+          <h3>pfm totp NAME <span class="what">2FA code</span></h3>
+          <p>Shows the current 6-digit code and how many seconds it is still valid. To copy it: <code>pfm get NAME --field totp</code>. The 2FA secret goes in with <code>pfm edit NAME --totp</code>.</p>
+          <div class="ex">
+            <div class="line"><span class="c">pfm totp github  <span class="hash"># shows the code</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm get github --field totp  <span class="hash"># copies the code</span></span><button type="button">Copy</button></div>
+          </div>
+        </article>
+        <article class="cmd">
+          <h3>pfm codes NAME <span class="what">recovery code</span></h3>
+          <p>Copies the next unused code and marks it used. Warns when two or fewer are left. With <code>--list</code>, shows them all and which were used (on screen, in plain text). To add the codes, see <a href="#codes-en">recovery codes</a>.</p>
+          <div class="ex">
+            <div class="line"><span class="c">pfm codes openai  <span class="hash"># copies the next one and marks it used</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm codes openai --list  <span class="hash"># all of them, (used) on the used ones</span></span><button type="button">Copy</button></div>
+          </div>
+          <p class="note">A code cannot be unmarked: run <code>pfm codes</code> only when you are about to use one. Marking on copy errs on the safe side: at worst you are one code short, and a spent code never comes back to the list. To rebuild the list, paste the codes again with <code>pfm edit NAME --codes</code>.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="add-en">
+      <h2>Adding</h2>
+      <p class="sub">A new password generated on the spot, a password you already have, or many at once.</p>
+      <div class="cards">
+        <article class="cmd">
+          <h3>pfm add NAME <span class="what">add an item</span></h3>
+          <p>Without <code>--generate</code>, it asks for the password twice, to check it. Use it this way to keep a password you don't want to change.</p>
+          <div class="tbl"><table>
+            <tr><th>Option</th><th>What it does</th></tr>
+            <tr><td><code>--username USER</code></td><td>the account's username or email</td></tr>
+            <tr><td><code>--url ADDRESS</code></td><td>the site's address; repeat it for several</td></tr>
+            <tr><td><code>--generate</code></td><td>generates a new password, saves it and copies it</td></tr>
+            <tr><td><code>--kind KIND</code></td><td>the kind of item (see <a href="#kinds-en">Kinds</a>); without it, a login</td></tr>
+            <tr><td><code>--file FILE</code></td><td>reads the secret from a file, such as an SSH key</td></tr>
+            <tr><td><code>--agent</code></td><td>lets programs (scripts, AI agents) read the item (see <a href="#agent-en">Agent</a>)</td></tr>
+          </table></div>
+          <p>With <code>--generate</code>, the <a href="#generator-en">generator</a> options apply: <code>--symbols</code>, <code>--length 16</code>, <code>--words 6</code>… Without <code>--generate</code>, they are an error rather than ignored.</p>
+          <div class="ex">
+            <div class="line"><span class="c">pfm add contabo.com --username root --url https://contabo.com --generate  <span class="hash"># new account</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm add router --username admin --url http://192.168.1.1  <span class="hash"># a password you already have</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm add bank.com --generate --symbols  <span class="hash"># with symbols</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm add app.com --generate --length 16  <span class="hash"># a site that limits the length</span></span><button type="button">Copy</button></div>
+          </div>
+        </article>
+        <article class="cmd">
+          <h3>pfm add-many <span class="what">many at once</span></h3>
+          <p>Asks for label, password, label, password… until an empty Enter. The master phrase is asked once and every item is saved right away: stopping halfway loses nothing. A pasted password is not shown. Handy for bringing passwords over from another manager; fill in each item afterwards with <code>pfm edit</code>.</p>
+          <div class="ex">
+            <div class="line"><span class="c">pfm add-many  <span class="hash"># Label: github.com, the password, Label: … an empty Enter finishes</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm edit github.com --username you@example.com --url https://github.com  <span class="hash"># fill in later</span></span><button type="button">Copy</button></div>
+          </div>
+        </article>
+        <article class="cmd">
+          <h3>Passwordless login <span class="what">SMS code, sign in with Google</span></h3>
+          <p>For a site you enter through your phone or your Google account, add it without <code>--generate</code> and, when it asks for the secret, press <strong>Enter without typing anything</strong>: the item is saved without a password. It is still worth adding, because a year from now the hard part is remembering <em>how</em> you signed in.</p>
+          <ul>
+            <li><code>--username</code>: the phone number or email you used. For Google sign-in, the Google account's email, since with several accounts it is easy to forget which one.</li>
+            <li><strong>Notes</strong>: the method ("sign in with Google", "SMS code"). <code>add</code> has no notes option: add them with <code>pfm edit NAME --notes</code> and finish the text with Ctrl-D on an empty line.</li>
+            <li><strong>Recovery codes</strong>: if the site has 2FA and offers backup codes, keep them in an item of their own, of kind <code>recovery-codes</code>.</li>
+            <li>If the site ever starts asking for a password, generate one on the existing item with <code>pfm edit NAME --generate</code>.</li>
+          </ul>
+          <div class="ex">
+            <div class="line"><span class="c">pfm add uber.com --username "+1 555 010 0199" --url https://uber.com  <span class="hash"># empty Enter for the secret</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm edit uber --notes  <span class="hash"># write the method; Ctrl-D finishes</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm add "uber codes" --kind recovery-codes  <span class="hash"># 2FA backup codes</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm edit uber --generate  <span class="hash"># if it starts asking for a password</span></span><button type="button">Copy</button></div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="kinds-en">
+      <h2>Kinds of item</h2>
+      <p class="sub"><code>pfm add NAME --kind KIND</code> asks for the kind's fields one by one; Enter skips a field. <code>pfm kinds</code> lists the kinds in the terminal. <code>--username</code>, <code>--url</code> and <code>--file</code> only apply to kinds that have that field, and <code>--generate</code> only to <code>login</code>, <code>wifi</code> and <code>bank</code>, whose secret is a password: a generated PIN, card or recovery phrase would make no sense.</p>
+      <div class="cards">
+        <article class="cmd">
+          <div class="tbl"><table>
+            <tr><th>Kind</th><th>For</th><th><code>get</code> copies</th></tr>
+            <tr><td><code>login</code> (default)</td><td>a site or app: username, password, URLs, 2FA</td><td>the password</td></tr>
+            <tr><td><code>note</code></td><td>free text</td><td>—</td></tr>
+            <tr><td><code>recovery-codes</code></td><td>backup codes; one per line when pasting, an empty line finishes (<a href="#codes-en">examples</a>)</td><td>use <code>pfm codes</code></td></tr>
+            <tr><td><code>recovery-phrase</code></td><td>an account's recovery phrase (Proton…); BIP-39 checked when it is one</td><td>the words</td></tr>
+            <tr><td><code>security-questions</code></td><td>security questions and answers</td><td><code>--field "the question"</code></td></tr>
+            <tr><td><code>pin</code></td><td>phone, alarm, lock</td><td>the PIN</td></tr>
+            <tr><td><code>api-key</code></td><td>an API key or token: its name on the site, its expiry</td><td>the key</td></tr>
+            <tr><td><code>crypto-seed</code></td><td>a wallet's recovery phrase; checks the BIP-39 checksum</td><td>the words</td></tr>
+            <tr><td><code>ssh-key</code></td><td>an SSH or GPG key, read with <code>--file</code></td><td>the private key</td></tr>
+            <tr><td><code>card</code></td><td>cardholder, number (check digit), expiry MM/YY, CVV, PIN</td><td>the number</td></tr>
+            <tr><td><code>bank</code></td><td>branch, account, app and transaction passwords, Pix key (Brazil's instant payments)</td><td>the app password</td></tr>
+            <tr><td><code>wifi</code></td><td>network and password</td><td>the password</td></tr>
+            <tr><td><code>license</code></td><td>a software license key</td><td>the key</td></tr>
+            <tr><td><code>document</code></td><td>ID, passport: number, dates, issuer</td><td>the number</td></tr>
+          </table></div>
+          <div class="ex">
+            <div class="line"><span class="c">pfm add visa --kind card</span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm add google-codes --kind recovery-codes</span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm add ledger --kind crypto-seed</span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm add ssh-github --kind ssh-key --file ~/.ssh/id_ed25519</span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm add "phone pin" --kind pin</span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm add "home wifi" --kind wifi --generate  <span class="hash"># the network's password, generated</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm add chase --kind bank</span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm add passport --kind document</span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm add "bank questions" --kind security-questions  <span class="hash"># question → answer, until an empty question</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm add "server notes" --kind note  <span class="hash"># free text; Ctrl-D on an empty line finishes</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm add jetbrains --kind license</span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm kinds  <span class="hash"># lists the kinds and each one's fields</span></span><button type="button">Copy</button></div>
+          </div>
+          <p class="note">Recovery phrases and card numbers are checked as you type them. A swapped word or a wrong digit makes <code>pfm</code> warn you and ask before saving, while the paper is still in your hand.</p>
+        </article>
+        <article class="cmd">
+          <h3>pfm add NAME --kind api-key <span class="what">keep an API key</span></h3>
+          <p><code>add</code> asks for one field at a time, in this order, and Enter skips any of them. <strong>The key name is asked here already</strong>: no <code>--set-field</code> needed. The account and the URL can also come on the command line, with <code>--username</code> and <code>--url</code>, and then it asks only for the rest.</p>
+          <div class="tbl"><table>
+            <tr><th>Field</th><th>What goes in it</th></tr>
+            <tr><td>Account</td><td>the account the key came from, usually the email. It is the item's username under another name. If the key leaks, it tells you where to revoke it.</td></tr>
+            <tr><td>Key name</td><td>the name you gave the key on the site, such as <code>john-laptop</code>: with several keys on one account, it tells which to revoke</td></tr>
+            <tr><td>Key</td><td>the key, pasted; it is not shown</td></tr>
+            <tr><td>URL</td><td>the dashboard where the key was created</td></tr>
+            <tr><td>Expires</td><td>the expiry; empty if it doesn't expire</td></tr>
+          </table></div>
+          <p>With <code>--agent</code>, programs (scripts, AI agents) can read the key (see <a href="#agent-en">Agent</a>). Use it only if a program will read the key; to copy and paste it yourself, leave it off, and the key never goes through the agent. In their configuration, use the <strong>whole title</strong>: <code>deepseek</code> would also match the <code>deepseek.com</code> login.</p>
+          <div class="ex">
+            <div class="line"><span class="c">pfm add "deepseek api key" --kind api-key  <span class="hash"># asks for account, key name, key, URL, expiry</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm add "deepseek api key" --kind api-key --username you@example.com --url https://platform.deepseek.com  <span class="hash"># account and URL on the command line</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm add "deepseek api key" --kind api-key --agent  <span class="hash"># a key a program will read</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm get "deepseek api key"  <span class="hash"># copies the key</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm get "deepseek api key" --field account  <span class="hash"># copies the account's email</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm edit "deepseek api key" --password  <span class="hash"># replace it with a new key</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm edit "deepseek api key" --set-field "Key name"  <span class="hash"># change the name later, or on an item made before the field existed</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm get "deepseek api key" --field "key name"  <span class="hash"># copies just the name</span></span><button type="button">Copy</button></div>
+          </div>
+          <p class="note">Several keys on one account: one item per key, with its name in the title too, such as <code>deepseek api key laptop</code> and <code>deepseek api key server</code>. Then <code>get</code>, <code>list</code> and the programs' configuration tell them apart by title alone.</p>
+        </article>
+        <article class="cmd">
+          <h3>One service, several logins <span class="what">one item per login</span></h3>
+          <p>Some services have one login for the app and another for the API, like Kimi: the chat at <code>kimi.ai</code> signs in by phone, and the API platform at <code>platform.kimi.ai</code> by email or Google. Add one item per login, each with its own username, and the key in a third item.</p>
+          <p>With several items starting with "kimi", <code>pfm get kimi</code> answers <em>"matches several items"</em> and lists them. Use the exact title, which always wins, or a part only one title has.</p>
+          <div class="ex">
+            <div class="line"><span class="c">pfm add kimi.ai --username "+1 555 010 0199" --url https://kimi.ai  <span class="hash"># chat, SMS code</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm add platform.kimi.ai --username you@email.com --url https://platform.kimi.ai  <span class="hash"># API, email code</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm add "kimi api key" --kind api-key  <span class="hash"># the key</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm show kimi.ai  <span class="hash"># exact title</span></span><button type="button">Copy</button></div>
+          </div>
+        </article>
+        <article class="cmd">
+          <h3>Several accounts on one service <span class="what">one item per account</span></h3>
+          <p>Two Zoho, Google or AWS accounts are two items, each with its own username and password. Put what tells them apart in the title (personal, work, the domain), so <code>get</code> finds the right one.</p>
+          <div class="ex">
+            <div class="line"><span class="c">pfm add "zoho.com personal" --username you@example.com --url https://www.zoho.com --generate</span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm add "zoho.com company" --username admin@company.com --url https://www.zoho.com --generate</span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm get "zoho.com company"  <span class="hash"># exact title</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm get company  <span class="hash"># or a part only it has</span></span><button type="button">Copy</button></div>
+          </div>
+        </article>
+        <article class="cmd">
+          <h3>One login, more than one email <span class="what">extra fields</span></h3>
+          <p>If it is the <strong>same login, with the same password</strong>, and the account has other emails (the signup one, an alias, the recovery one), <code>--username</code> holds the one you type to sign in, and the others go in extra fields. The field name is free: <code>Alias</code>, <code>Signup email</code>, <code>Recovery email</code>, whatever makes sense to you.</p>
+          <p>Extra fields exist only in <code>edit</code>: add the item first, then the fields. If the other email signs in with <strong>another password</strong>, it is another login, and another item.</p>
+          <div class="ex">
+            <div class="line"><span class="c">pfm add "zoho.com company" --username you@company.com --url https://www.zoho.com --generate  <span class="hash"># the email you sign in with</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm edit "zoho.com company" --set-field "Signup email"  <span class="hash"># asks for the value, visibly</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm get "zoho.com company" --field "signup email"  <span class="hash"># copies the field</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm edit "zoho.com company" --rm-field "Signup email"  <span class="hash"># removes the field</span></span><button type="button">Copy</button></div>
+          </div>
+        </article>
+        <article class="cmd" id="codes-en">
+          <h3>pfm add NAME --kind recovery-codes <span class="what">recovery codes and their file</span></h3>
+          <p>A site's 2FA backup codes (OpenAI, GitHub, Google…). The kind asks for the account and the URL, which can also come on the command line, and then the codes: paste them all, <strong>one per line</strong>, and finish with an <strong>empty line</strong>. A code with a space in it is fine. They are not shown.</p>
+          <p>If the site gave you a file with the codes, attach it with <code>edit --attach</code> as a copy of the original. The codes still go in the item, since <code>pfm codes</code> uses the item's.</p>
+          <div class="ex">
+            <div class="line"><span class="c">pfm add "openai recovery codes" --kind recovery-codes --username you@example.com --url https://openai.com  <span class="hash"># paste; an empty line finishes</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm edit "openai recovery codes" --attach ~/Downloads/openai-recovery-codes.txt  <span class="hash"># keeps the file</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm codes openai  <span class="hash"># when you need one: copies it</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm codes openai --list  <span class="hash"># which are left</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm get "openai recovery codes" --attachment openai-recovery-codes.txt --output ~/Desktop  <span class="hash"># gives the file back</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm edit github --codes  <span class="hash"># codes inside a login, or a new batch</span></span><button type="button">Copy</button></div>
+          </div>
+          <p class="note">Made new codes on the site? <code>pfm edit NAME --codes --attach NEW_FILE</code> replaces the codes and attaches the new file; <code>--rm-attachment</code> removes the old one. Then delete the file in <code>~/Downloads</code>.</p>
+        </article>
+        <article class="cmd">
+          <h3>pfm add NAME --kind recovery-phrase <span class="what">recovery phrase and file</span></h3>
+          <p>Services such as Proton give a <strong>recovery phrase</strong> (12 words) and sometimes a <strong>recovery file</strong>. The <code>recovery-phrase</code> kind asks for the account, the URL and the words. If the phrase has the length of a BIP-39 phrase (12, 15, 18, 21 or 24 words), <code>pfm</code> checks it: a swapped or mistyped word shows at once. Phrases of any other form are kept as typed.</p>
+          <p>The file goes in as an <strong>attachment</strong>, encrypted inside the item, with <code>edit --attach</code>. An item's attachments add up to 512 KiB at most: the whole vault travels on every sync, so only small files fit.</p>
+          <div class="ex">
+            <div class="line"><span class="c">pfm add proton-recovery --kind recovery-phrase  <span class="hash"># account, URL and the 12 words</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm edit proton-recovery --attach ~/Downloads/proton-recovery.txt  <span class="hash"># keeps the file in the item</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm get proton-recovery  <span class="hash"># copies the words</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm get proton-recovery --attachment proton-recovery.txt --output ~/Downloads  <span class="hash"># gives the file back</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm edit proton-recovery --rm-attachment proton-recovery.txt  <span class="hash"># removes the attachment</span></span><button type="button">Copy</button></div>
+          </div>
+          <p class="note"><code>get --attachment</code> never overwrites a file and writes it readable by you only. Once the file is in <code>pfm</code>, delete the copy in <code>~/Downloads</code>.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="edit-en">
+      <h2>Editing and deleting</h2>
+      <div class="cards">
+        <article class="cmd">
+          <h3>pfm edit NAME <span class="what">change an item</span></h3>
+          <p>Changes only what you ask for; the password stays the same unless you use <code>--generate</code> or <code>--password</code>.</p>
+          <div class="tbl"><table>
+            <tr><th>Option</th><th>What it does</th></tr>
+            <tr><td><code>--title NEW</code></td><td>renames it</td></tr>
+            <tr><td><code>--username USER</code></td><td>changes the username</td></tr>
+            <tr><td><code>--url</code> / <code>--rm-url</code></td><td>adds / removes an address</td></tr>
+            <tr><td><code>--password</code></td><td>type a new password</td></tr>
+            <tr><td><code>--generate</code></td><td>generates a new password and copies it; only on <code>login</code>, <code>wifi</code> and <code>bank</code> items</td></tr>
+            <tr><td><code>--totp</code></td><td>paste the 2FA secret (text or <code>otpauth://</code> link)</td></tr>
+            <tr><td><code>--notes</code></td><td>write notes; finish with Ctrl+D</td></tr>
+            <tr><td><code>--set-field NAME</code></td><td>creates or changes a visible field</td></tr>
+            <tr><td><code>--set-secret-field NAME</code></td><td>creates or changes a hidden field</td></tr>
+            <tr><td><code>--rm-field NAME</code></td><td>removes a field</td></tr>
+            <tr><td><code>--codes</code></td><td>replaces the recovery codes</td></tr>
+            <tr><td><code>--attach FILE</code></td><td>keeps a small file in the item; one with the same name is replaced</td></tr>
+            <tr><td><code>--rm-attachment NAME</code></td><td>removes an attachment</td></tr>
+            <tr><td><code>--kind KIND</code></td><td>changes the kind, losing nothing</td></tr>
+            <tr><td><code>--agent</code> / <code>--no-agent</code></td><td>turns program access on or off</td></tr>
+          </table></div>
+          <div class="ex">
+            <div class="line"><span class="c">pfm edit deepseek --url https://chat.deepseek.com --url https://deepseek.com  <span class="hash"># addresses on an existing item; the password stays</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm edit contabo --generate  <span class="hash"># changed the password on the site</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm edit github --totp  <span class="hash"># turned on 2FA</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm edit alarm --kind pin</span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm edit contabo --title contabo.com  <span class="hash"># renames it</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm edit contabo --username new@example.com  <span class="hash"># changes the username</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm edit deepseek --rm-url https://deepseek.com  <span class="hash"># removes an address</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm edit router --password  <span class="hash"># type the new password, twice</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm edit contabo --generate --symbols --length 20  <span class="hash"># generate by the site's rules</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm edit uber --notes  <span class="hash"># notes; Ctrl-D on an empty line finishes, empty removes them</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm edit chase --set-secret-field "App password"  <span class="hash"># hidden field, typed without echo</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm edit chase --rm-field "App password"  <span class="hash"># removes the field</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm edit "deepseek api key" --agent  <span class="hash"># programs may read it; --no-agent undoes it</span></span><button type="button">Copy</button></div>
+          </div>
+        </article>
+        <article class="cmd" id="attachments-en">
+          <h3>Attachments <span class="what">small files inside an item</span></h3>
+          <p>A recovery file, codes in a <code>.txt</code>, a PDF with the words: <code>edit --attach</code> keeps the file inside the item, and <code>get --attachment</code> gives it back. Up to 512 KiB for all of an item's attachments; an attachment with the same name replaces the old one.</p>
+          <p><strong>An attachment is always encrypted</strong>, together with the rest of the item: in the laptop's vault, in its <code>.bak</code>, on the server and in its history, and during sync. Programs (the agent) never receive attachments. It is in plain text in two places only, both by your doing: the original file, until you delete it, and the copy <code>get --attachment</code> writes (readable by you only, never overwriting anything). The server sees only the item's rough size, never the content or the file's name.</p>
+          <div class="ex">
+            <div class="line"><span class="c">pfm edit proton-recovery --attach ~/Downloads/proton-recovery.pdf  <span class="hash"># attaches</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm edit proton-recovery --attach a.txt --attach b.txt  <span class="hash"># several at once</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm show proton-recovery  <span class="hash"># lists: Attachment: name (size)</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm get proton-recovery --attachment proton-recovery.pdf  <span class="hash"># saves in the current folder</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm get proton-recovery --attachment proton-recovery.pdf --output ~/proton.pdf  <span class="hash"># saves under another name</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm edit proton-recovery --rm-attachment proton-recovery.pdf  <span class="hash"># removes</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">rm ~/Downloads/proton-recovery.pdf  <span class="hash"># once attached, delete the original</span></span><button type="button">Copy</button></div>
+          </div>
+        </article>
+        <article class="cmd">
+          <h3>pfm rm NAME <span class="what">delete an item</span></h3>
+          <p>Asks you to type the title back, to confirm. With a synced vault, the item goes from the other devices too.</p>
+          <div class="ex">
+            <div class="line"><span class="c">pfm rm router  <span class="hash"># type the title to confirm</span></span><button type="button">Copy</button></div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="generator-en">
+      <h2>Generator</h2>
+      <p class="sub">The default is the Contabo style: 29 letters and digits, 173 bits. Nothing that breaks in a form, and a double-click selects all of it.</p>
+      <div class="cards">
+        <article class="cmd">
+          <h3>pfm generate <span class="what">generate only, without saving</span></h3>
+          <div class="tbl"><table>
+            <tr><th>Option</th><th>What it does</th></tr>
+            <tr><td><code>--symbols</code></td><td>with symbols</td></tr>
+            <tr><td><code>--length N</code></td><td>length, from 4 to 1024</td></tr>
+            <tr><td><code>--no-digits</code>, <code>--no-uppercase</code>, <code>--no-lowercase</code></td><td>leaves out digits, uppercase or lowercase</td></tr>
+            <tr><td><code>--avoid-ambiguous</code></td><td>leaves out look-alike characters: l, 1, O, 0</td></tr>
+            <tr><td><code>--words N</code></td><td>a phrase of N words instead of characters</td></tr>
+            <tr><td><code>--lang pt-br</code>, <code>--lang en</code></td><td>language of the words; only with <code>--words</code></td></tr>
+            <tr><td><code>--separator X</code></td><td>what goes between the words (default <code>-</code>); only with <code>--words</code></td></tr>
+            <tr><td><code>--copy</code></td><td>copies instead of printing</td></tr>
+          </table></div>
+          <div class="ex">
+            <div class="line"><span class="c">pfm generate  <span class="hash"># Tguod41e8MFOYKBFPF30bSxnxeIkE</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm generate --words 6 --lang en  <span class="hash"># unused-tingly-snowless-…</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm generate --length 6 --no-lowercase --no-uppercase  <span class="hash"># a 6-digit PIN</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm generate --symbols --length 20  <span class="hash"># a site that demands a symbol and allows 20</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm generate --avoid-ambiguous  <span class="hash"># to read and type by hand</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm generate --words 5 --separator " "  <span class="hash"># words separated by spaces</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm generate --copy  <span class="hash"># copies without showing it</span></span><button type="button">Copy</button></div>
+          </div>
+          <p class="note">No option is ignored: if one makes no sense in the command, <code>pfm</code> refuses it before asking for anything. Phrases and characters don't mix: <code>--words</code> takes no <code>--length</code>, <code>--symbols</code>, <code>--no-…</code> or <code>--avoid-ambiguous</code>. In <code>add</code> and <code>edit</code>, every generator option needs <code>--generate</code>.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="session-en">
+      <h2>Session and security</h2>
+      <div class="cards">
+        <article class="cmd">
+          <h3>Session <span class="what">automatic</span></h3>
+          <p>Type the master phrase once, and the next commands don't ask again. It locks after 15 minutes unused, when the screen locks, when the laptop suspends, or with <code>pfm lock</code>. It only applies to commands typed in a terminal.</p>
+          <p>To change the time, create <code>~/.config/passforme/config</code> with one line:</p>
+          <div class="ex">
+            <div class="line"><span class="c">session = 1h  <span class="hash"># or 30m; "off" always asks</span></span><button type="button">Copy</button></div>
+          </div>
+        </article>
+        <article class="cmd">
+          <h3>pfm lock <span class="what">lock now</span></h3>
+          <p>Closes the session and empties the agent. Good before lending the laptop or walking away.</p>
+          <div class="ex">
+            <div class="line"><span class="c">pfm lock</span><button type="button">Copy</button></div>
+          </div>
+        </article>
+        <article class="cmd">
+          <h3>pfm status <span class="what">see the state</span></h3>
+          <p>Whether the session is open and for how long, whether the agent is running and with which items, and the sync server. It takes no item name.</p>
+          <div class="ex">
+            <div class="line"><span class="c">pfm status</span><button type="button">Copy</button></div>
+          </div>
+        </article>
+        <article class="cmd">
+          <h3>pfm passwd <span class="what">change the master phrase</span></h3>
+          <p>Re-encrypts the vault under a new key. The Secret Key stays the same. Write the new phrase on the Emergency Kit. With a server, the other devices ask for the new phrase on their next sync.</p>
+          <div class="ex">
+            <div class="line"><span class="c">pfm passwd  <span class="hash"># the current phrase, then the new one twice</span></span><button type="button">Copy</button></div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="agent-en">
+      <h2>Agent (programs)</h2>
+      <p class="sub">Programs (scripts, AI agents) don't use the session. They only read the items you mark, and nothing else in the vault.</p>
+      <div class="cards">
+        <article class="cmd">
+          <div class="tbl"><table>
+            <tr><th>Command</th><th>What it does</th></tr>
+            <tr><td><code>pfm edit openrouter --agent</code></td><td>marks the item for programs</td></tr>
+            <tr><td><code>pfm unlock</code></td><td>hands the marked items to the agent for 8 hours</td></tr>
+            <tr><td><code>pfm unlock --for forever</code></td><td>until you lock, reboot or log out</td></tr>
+            <tr><td><code>pfm unlock --for 2h gemini</code></td><td>only the items named, for the time given</td></tr>
+            <tr><td><code>pfm get NAME --stdout</code></td><td>what the program calls to read the value</td></tr>
+          </table></div>
+          <div class="ex">
+            <div class="line"><span class="c">pfm edit "deepseek api key" --agent  <span class="hash"># 1. mark it</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm unlock --for 8h  <span class="hash"># 2. release it, with the master phrase</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm get "deepseek api key" --stdout  <span class="hash"># 3. what the program runs</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">DEEPSEEK_API_KEY="$(pfm get 'deepseek api key' --stdout)" ./my-script  <span class="hash"># in a script</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm status  <span class="hash"># what the agent holds and for how long</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm lock  <span class="hash"># empties the agent now</span></span><button type="button">Copy</button></div>
+          </div>
+          <p class="note">With no agent released, <code>get --stdout</code> outside a terminal fails at once, instead of waiting for a phrase nobody will type.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="sync-en">
+      <h2>Sync</h2>
+      <p class="sub">Happens by itself on every <code>add</code>, <code>edit</code>, <code>rm</code> and <code>codes</code>. If the server is down, the change stays on the laptop and goes up next time. The server only keeps the encrypted vault.</p>
+      <div class="cards">
+        <article class="cmd">
+          <div class="tbl"><table>
+            <tr><th>Command</th><th>When to use it</th></tr>
+            <tr><td><code>pfm sync</code></td><td>force an exchange with the server</td></tr>
+            <tr><td><code>pfm register URL</code></td><td>link the vault to an empty server</td></tr>
+            <tr><td><code>pfm init</code></td><td>create a new vault</td></tr>
+          </table></div>
+          <div class="ex">
+            <div class="line"><span class="c">pfm sync  <span class="hash"># after changing something on another device</span></span><button type="button">Copy</button></div>
+            <div class="line"><span class="c">pfm status  <span class="hash"># shows which server it is linked to</span></span><button type="button">Copy</button></div>
+          </div>
+          <p class="note">An item edited on two devices at once: the server's version stays and yours becomes <code>"title (conflict)"</code>. Nothing typed is lost.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="emergency-en">
+      <h2>Emergency</h2>
+      <p class="sub">Laptop broken, stolen or replaced? The vault comes back whole from your server, with the Emergency Kit.</p>
+      <div class="cards">
+        <article class="cmd">
+          <h3>pfm login URL <span class="what">set up a new device</span></h3>
+          <p>Asks for the Secret Key (it starts with <code>SB1-</code>) and the master phrase, both from the Emergency Kit, and downloads the vault.</p>
+          <div class="ex">
+            <div class="line"><span class="c">pfm login https://pfm.example.com</span><button type="button">Copy</button></div>
+          </div>
+          <p class="note">Without the Secret Key and the phrase there is no recovery: not even the server can open the vault. That is why the Emergency Kit stays on paper, kept away from the laptop.</p>
+        </article>
+      </div>
+    </section>
+
+    <p class="empty" hidden>No command matches that.</p>
+  </main>
+</div>
+
+<footer class="footer">
+  <span>passforme</span>
+  <span><span data-lang="pt">Código aberto · em desenvolvimento ·</span><span data-lang="en" hidden>Open source · in development ·</span> <a href="https://github.com/passforme" target="_blank" rel="noopener">github.com/passforme</a></span>
+</footer>
+</body>
+</html>

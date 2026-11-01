@@ -1,0 +1,49 @@
+[Unit]
+Description=passforme sync server (ciphertext only)
+After=network.target
+
+[Service]
+# A system user with no shell and no password. The data directory holds only
+# ciphertext, the auth hash and the history of both.
+User=passforme
+Group=passforme
+ExecStart=/usr/local/bin/passforme-server --data /var/lib/passforme serve --listen 127.0.0.1:8090
+Restart=on-failure
+
+StateDirectory=passforme
+StateDirectoryMode=0700
+UMask=0077
+
+# Reached only through `tailscale serve` on this machine: no address other
+# than loopback, in or out.
+IPAddressDeny=any
+IPAddressAllow=localhost
+RestrictAddressFamilies=AF_INET AF_INET6
+MemoryMax=64M
+TasksMax=64
+
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+RestrictSUIDSGID=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+ProcSubset=pid
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+
+[Install]
+WantedBy=multi-user.target

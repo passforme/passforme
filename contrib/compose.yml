@@ -1,0 +1,24 @@
+# passforme-server with Docker Compose. Copy it to the server, then:
+#
+#   docker compose up -d
+#   docker compose exec passforme passforme-server --data /data invite
+#
+# The port is published on 127.0.0.1 only: put HTTPS in front of it, e.g.
+# `tailscale serve --bg --https=443 http://127.0.0.1:8090`
+# (docs/self-hosting.md).
+services:
+  passforme:
+    image: ghcr.io/passforme/passforme-server:latest
+    restart: always
+    ports:
+      - "127.0.0.1:8090:8090"
+    volumes:
+      - passforme-data:/data
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 64m
+    pids_limit: 64
+
+volumes:
+  passforme-data:

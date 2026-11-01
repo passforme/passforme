@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# Build passforme-server on this machine, copy it and its systemd unit to the
+# server, restart it and check that it answers. Settings come from
+# config/deploy.env (not in Git).
+#
+# The standard bin/deploy builds a Docker image; this one ships a single
+# static binary under systemd instead, whose unit (contrib/) confines it to
+# loopback with no capabilities. The steps are the same: build here, ship,
+# restart, never build on the server.
+#
+#   bin/deploy            deploys the current working tree
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+env_file="config/deploy.env"
+if [[ ! -f "$env_file" ]]; then
+  echo "missing $env_file; copy config/deploy.env.example and fill it in" >&2
+  exit 1
+fi
+# shellcheck disable=SC1090
+source "$env_file"
+: "${DEPLOY_HOST:?set DEPLOY_HOST in $env_file}"
+: "${DEPLOY_URL:?set DEPLOY_URL in $env_file}"
+read -r -a ssh_opts <<< "${SSH_OPTS:-}"
+
+rev="$(git rev-parse --short HEAD)"
+if [[ -n "$(git status --porcelain)" ]]; then
+  rev="$rev-dirty"
+fi
+
+echo "==> build passforme-server ($rev)"
+cargo build --release --locked -p passforme-server
+
+echo "==> copy to $DEPLOY_HOST"
+tmp="$(ssh "${ssh_opts[@]}" "$DEPLOY_HOST" mktemp -d)"
+scp -q "${ssh_opts[@]}" target/release/passforme-server contrib/passforme-server.service \
+  "$DEPLOY_HOST:$tmp/"
+
+echo "==> install and restart"
+ssh "${ssh_opts[@]}" "$DEPLOY_HOST" "set -e
+  sudo install -m 755 '$tmp/passforme-server' /usr/local/bin/
+  sudo install -m 644 '$tmp/passforme-server.service' /etc/systemd/system/
+  rm -rf '$tmp'
+  sudo systemctl daemon-reload
+  sudo systemctl restart passforme-server
+  sleep 1
+  systemctl is-active passforme-server"
+
+echo "==> check $DEPLOY_URL"
+code="$(curl -s -o /dev/null -w '%{http_code}' "$DEPLOY_URL/api/v1/prelogin")"
+if [[ "$code" != 200 ]]; then
+  echo "the server answered $code to /api/v1/prelogin" >&2
+  exit 1
+fi
+
+echo "==> deployed passforme-server $rev"
