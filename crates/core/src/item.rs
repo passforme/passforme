@@ -196,7 +196,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(item.kind, Kind::Login);
-        assert!(item.codes.is_empty());
+        assert_eq!(item.codes, Vec::new());
     }
 
     #[test]

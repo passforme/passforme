@@ -190,7 +190,7 @@ mod tests {
 
         let report = merge(&d.base, &local, &mut remote, &mut rng()).unwrap();
         assert_eq!(report.pushed, 3);
-        assert!(report.conflicts.is_empty());
+        assert_eq!(report.conflicts, Vec::<String>::new());
         assert_eq!(
             Devices::titles(&remote),
             pairs(&[
