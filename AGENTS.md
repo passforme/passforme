@@ -140,7 +140,7 @@ project.
 | `docs/brand/` | The two logos the README shows, copied from the brand kit in [passforme/website](https://github.com/passforme/website) (`site/brand/logo/`), where they are generated; when the kit changes, copy them again. |
 | `tools/*_reference.py` | Independent Python implementations the cryptography and TOTP tests are checked against. |
 | `CONTRIBUTING.md` | What a contributor reads first: issue before code, the rules in short, DCO sign-off. |
-| `SECURITY.md` | How to report a vulnerability (`hello@passforme.com`); only the latest release gets fixes. |
+| `SECURITY.md` | How to report a vulnerability (`security@passforme.com`); only the latest release gets fixes. |
 | `CHANGELOG.md` | Keep a Changelog; every user-visible change adds a line under `[Unreleased]`, and the release workflow uses the version's section as the release notes. |
 
 ## Website

@@ -6,7 +6,7 @@ before it is made public.
 
 ## Reporting a vulnerability
 
-Write to **hello@passforme.com**, or use GitHub's private vulnerability
+Write to **security@passforme.com**, or use GitHub's private vulnerability
 reporting ("Report a vulnerability" under the repository's Security tab).
 Say what you found, how to reproduce it and what it lets an attacker do;
 never include your own vault, Secret Key or passwords.
