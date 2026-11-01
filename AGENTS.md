@@ -61,9 +61,9 @@ passforme sync           # exchange changes; add, edit and rm sync on their own
 
 - [`docs/design.md`](docs/design.md): **how passforme works and why**,
   in full: every command and option, the session, the kinds of item,
-  the unlock agent, sync and its merge, deployment, the roadmap, and
-  each decision with its date and what was rejected. An agent that has
-  read it knows the project; read it before changing behaviour.
+  the unlock agent, sync and its merge, deployment, and each decision
+  with what was rejected. An agent that has read it knows the project;
+  read it before changing behaviour.
 - [`docs/threat-model.md`](docs/threat-model.md): what the design
   protects against (a stolen or malicious server, offline guessing,
   eavesdropping) and what it accepts (malware on an unlocked laptop, a

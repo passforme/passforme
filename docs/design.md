@@ -437,29 +437,3 @@ First install also needs `useradd --system --no-create-home --home-dir
 loopback (`IPAddressDeny=any`, `IPAddressAllow=localhost`), 64 MB, no
 capabilities: `systemd-analyze security` 1.1. Invite, on the server:
 `sudo -u passforme passforme-server --data /var/lib/passforme invite`.
-
-## Next
-
-**A web client served by the sync server**, for the phone and
-emergencies; the computer keeps the CLI. It decrypts in the browser
-(`core` compiled to WASM), so whoever serves the page could serve one
-that steals the master password: the weakness of every web vault
-(Bitwarden's included), accepted for the convenience. The disk
-encryption of the server does not help here: it covers physical access
-to a powered-off machine, while this risk is a remote compromise of a
-running one. Mitigations, all part of the plan:
-
-- the server reachable only through `tailscale serve`, nothing on the LAN;
-- the machine runs only `passforme-server`; the page is embedded in that
-  binary, built elsewhere, with no third-party code and a strict CSP;
-- the computer that builds it never uses the web client, so it never
-  trusts code from the server;
-- a watcher on that computer fetches the served page periodically,
-  compares it byte for byte with the build, and alerts if it differs;
-- the server still holds only ciphertext.
-
-Rejected for now: a native phone app (Android sideloading is doable,
-iPhone needs a paid developer account) and a browser extension
-(autofill; maybe later). Rule regardless of client: **no code that
-decrypts is delivered by the server without a signature made off the
-server**, except this web client, by the decision above.
