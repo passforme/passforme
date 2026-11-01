@@ -363,9 +363,9 @@ fn main() -> ExitCode {
     }
 }
 
-/// Short options were dropped on 2026-10-21: every option is long only, so
-/// commands read the same everywhere. One typed from habit gets its new
-/// name rather than a bare "unexpected argument".
+/// Every option is long only, so commands read the same everywhere. A short
+/// form typed from habit gets the long name rather than a bare "unexpected
+/// argument".
 const RETIRED: &[(&str, &str)] = &[
     ("-u", "--username"),
     ("-g", "--generate"),
@@ -380,7 +380,9 @@ fn retired_option() -> Option<String> {
     let args: Vec<String> = std::env::args().skip(1).take_while(|a| a != "--").collect();
     for arg in &args {
         if let Some((short, long)) = RETIRED.iter().find(|(short, _)| arg == short) {
-            return Some(format!("{short} is now {long} (options are long only)"));
+            return Some(format!(
+                "use {long} instead of {short} (options are long only)"
+            ));
         }
     }
     let in_edit = args.first().is_some_and(|c| c == "edit");
@@ -393,7 +395,7 @@ fn retired_option() -> Option<String> {
                 .iter()
                 .any(|a| a == old || a.starts_with(&format!("{old}=")))
         {
-            return Some(format!("in `edit`, {old} is now {new}"));
+            return Some(format!("in `edit`, use {new} instead of {old}"));
         }
     }
     None
