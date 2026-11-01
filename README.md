@@ -91,8 +91,8 @@ cargo test --workspace
 Before changing anything that touches a secret, read
 [`docs/threat-model.md`](docs/threat-model.md) and
 [`docs/cryptography.md`](docs/cryptography.md). The reasons behind the
-rest of the design are in [`AGENTS.md`](AGENTS.md); the website is in
-[`site/`](site/).
+rest of the design are in [`AGENTS.md`](AGENTS.md). The website,
+with the guide, is [passforme/website](https://github.com/passforme/website).
 
 ## License
 

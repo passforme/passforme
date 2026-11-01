@@ -30,7 +30,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with a hardened `contrib/compose.yml`, and a self-hosting guide
   (`docs/self-hosting.md`) recommending Tailscale.
 - Tab completion for bash, zsh, fish, elvish and PowerShell.
-- The passforme.com website, with the command guide and the brand kit.
 
 ### Security
 

@@ -507,22 +507,14 @@ loopback (`IPAddressDeny=any`, `IPAddressAllow=localhost`), 64 MB, no
 capabilities: `systemd-analyze security` 1.1. Invite, on the server:
 `sudo -u passforme passforme-server --data /var/lib/passforme invite`.
 
-## Website (`site/`)
+## Website
 
-Since 2026-10-24: the home page and the command guide of
-`passforme.com`, static, in Portuguese and English. The guide began as a
-private page for the user and became the project's documentation, with
-the author's own setup (hostnames, tailnet, programs) replaced by generic
-examples. Rules, layout and fonts in `site/README.md`; the one that
-matters here: **a change to a command or option updates `site/guide.html`
-in the same commit.** Not deployed yet (Cloudflare Pages).
-
-Brand kit (2026-10-31): `site/brand.html` shows and offers for download
-the logo, the mark (gold `#e0ac5c`, the main one, and brass `#8a5a12`),
-the colours, the fonts, favicons and social images; all of it generated
-by `tools/brand.py` (see `site/README.md`). The site calls itself open
-source and links **https://github.com/passforme**, the project's official
-home, from every page.
+The home page, the command guide and the brand kit of `passforme.com`
+live in their own repository since 2026-11-01:
+[passforme/website](https://github.com/passforme/website), with its own
+`AGENTS.md` (until then they were `site/` here). The rule that crosses
+the two: **a change to a command or option is followed by the guide's
+update there**, and noted in `CHANGELOG.md` here.
 
 ## Project plans (domain, accounts, release)
 
@@ -545,7 +537,8 @@ home, from every page.
   Mailbox `hello@passforme.com` since 2026-10-31, with MX, SPF, DKIM
   and DMARC (`p=none` for now) in place; details in `AGENTS.local.md`.
 - **After the move**, in this order: the Zoho mailboxes; the social
-  accounts, signed up with those addresses; Cloudflare Pages for `site/`.
+  accounts, signed up with those addresses; Cloudflare Pages for the
+  website.
   The Cloudflare and Zoho accounts' own logins must **not** be
   `@passforme.com` addresses: mail depends on DNS at Cloudflare and on
   Zoho itself, so losing one would lock out the way back in.
