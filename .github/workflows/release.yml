@@ -104,7 +104,13 @@ jobs:
             echo
             echo "## Install"
             echo
-            echo "Download the archive for your machine, check it and put \`passforme\` on your PATH:"
+            echo "One line, which downloads the archive for your machine, checks it and installs \`passforme\` and \`pfm\` into ~/.local/bin:"
+            echo
+            echo '```sh'
+            echo "curl -fsSL https://raw.githubusercontent.com/passforme/passforme/main/install.sh | sh"
+            echo '```'
+            echo
+            echo "Or by hand:"
             echo
             echo '```sh'
             echo "sha256sum -c ${NAME}-${version}-x86_64-unknown-linux-gnu.tar.gz.sha256"

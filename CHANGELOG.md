@@ -30,6 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with a hardened `contrib/compose.yml`, and a self-hosting guide
   (`docs/self-hosting.md`) recommending Tailscale.
 - Tab completion for bash, zsh, fish, elvish and PowerShell.
+- `install.sh`, the README's one-line install: downloads the latest
+  release for the machine, checks its checksum and installs `passforme`
+  and `pfm` into `~/.local/bin`.
 
 ### Security
 
