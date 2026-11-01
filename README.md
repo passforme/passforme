@@ -1,4 +1,11 @@
-# passforme
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/brand/logo-gold-on-dark.svg">
+    <img src="docs/brand/logo-brass-on-light.svg" alt="passforme" width="440">
+  </picture>
+</p>
+
+<p align="center"><strong>A password vault only you can open.</strong></p>
 
 A password vault that only you can open, kept in sync between your devices
 by a server you run yourself, which never sees anything but ciphertext.
