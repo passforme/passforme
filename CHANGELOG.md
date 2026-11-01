@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-01
+
 ### Added
 
 - Vault encrypted on the device with XChaCha20-Poly1305; opening it takes
@@ -34,4 +36,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   release for the machine, checks its checksum and installs `passforme`
   and `pfm` into `~/.local/bin`.
 
-[Unreleased]: https://github.com/passforme/passforme/commits/main
+[Unreleased]: https://github.com/passforme/passforme/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/passforme/passforme/releases/tag/v0.1.0
