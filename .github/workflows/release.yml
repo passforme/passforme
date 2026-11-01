@@ -125,7 +125,7 @@ jobs:
             echo '```'
           } >> notes.md
 
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ inputs.tag || github.ref_name }}
           body_path: notes.md
