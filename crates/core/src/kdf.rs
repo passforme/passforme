@@ -48,7 +48,7 @@ pub struct KdfParams {
 }
 
 impl KdfParams {
-    /// 256 MiB, 3 passes, 1 lane: about 0.6 s per unlock on the laptop.
+    /// 256 MiB, 3 passes, 1 lane: about 0.6 s per unlock on a laptop.
     pub const DEFAULT: Self = Self {
         memory_kib: 256 * 1024,
         iterations: 3,

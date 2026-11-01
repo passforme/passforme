@@ -7,13 +7,55 @@ only ciphertext. Linux, terminal first. Domain `passforme.com`, GitHub
 org `passforme` (https://github.com/passforme), open source under
 AGPL-3.0-only.
 
-Started as the owner's personal tool for their homelab, it is becoming a
-product. **What is true only of one person's machines and accounts**
+**What is true only of one person's machines and accounts**
 (their server's address, Cloudflare and mail accounts, the programs on
 their laptop) goes in `AGENTS.local.md`, ignored by Git, and never into a
 tracked file. Anyone working on the project may keep one: read it when it
 exists. (`CLAUDE.local.md`, also ignored, may contain `@AGENTS.local.md`
 so that Claude Code loads it.)
+
+## Commands
+
+```
+passforme init                      # vault + Secret Key, prints the Emergency Kit
+passforme generate [--length 32] [--symbols] [--avoid-ambiguous] [--words 6 [--lang pt-br]] [--copy]
+passforme add TITLE [--username USER] [--url URL]... [--generate [generator options]]
+passforme add TITLE --kind KIND [--file PATH]   # card, pin, crypto-seed…: asks for each field
+passforme kinds                     # the kinds and what each holds
+passforme codes QUERY [--list]      # copy the next unused recovery code, mark it used
+passforme add-many                  # label + secret, repeated; vault opened once, saved per item
+passforme list                      # table: user, URL, AGENT, what else it holds (no secrets)
+passforme show QUERY [--reveal]     # secrets masked unless --reveal
+passforme get QUERY [--field FIELD] # clipboard, cleared after 30 s; FIELD: password (default),
+                                    # username, url, totp, cvv, pin, number… or any field name
+passforme get QUERY --attachment NAME [--output PATH]  # save an attached file (0600, never overwrites)
+passforme rm QUERY                  # asks for the title to be typed back
+passforme edit QUERY [--title T] [--username USER] [--url URL] [--rm-url URL]
+                     [--password | --generate [generator options]] [--totp] [--notes]
+                     [--set-field NAME] [--set-secret-field NAME] [--rm-field NAME]
+                     [--codes] [--kind KIND] [--attach PATH] [--rm-attachment NAME]
+passforme totp QUERY                # current code; `get --field totp` copies it
+passforme passwd                    # new master password, vault key rotated
+passforme unlock [--for 8h|forever] [ITEM…]  # marked items (all, or the ones named) to the agent
+passforme get QUERY --stdout        # value alone on stdout, for programs
+passforme lock                      # close the session and empty the agent now
+passforme status                    # session, agent (locked / time left / no limit), sync link
+passforme completions bash          # Tab completion script (sourced from ~/.bashrc)
+```
+
+`QUERY` is a title, case-insensitive: an exact title wins, otherwise it
+must be part of exactly one title. Every option is long only. The first
+command at a terminal asks for the master password and opens a session;
+the next ones do not ask until the vault sits unused for 15 minutes, a
+screen locker runs, or `passforme lock`. Programs without a terminal use
+the unlock agent (`unlock`, then `get --stdout`), which holds only the
+items marked `--agent`. The sync server is optional:
+
+```
+passforme register URL   # put this vault on an empty server (asks for the invite)
+passforme login URL      # new device: Secret Key + master password
+passforme sync           # exchange changes; add, edit and rm sync on their own
+```
 
 ## Read first
 
@@ -54,10 +96,9 @@ is written into `docs/design.md`, dated, with what it replaced.
   builds x86_64 and aarch64 Linux tarballs with checksums and uses that
   section as the release notes. Linux only: the client needs `prctl`,
   `/proc` and `wl-copy`.
-- License **AGPL-3.0-only** (chosen 2026-10-31): a modified sync server
-  offered to others must publish its changes. The owner keeps the right
-  to license an Enterprise edition separately, so outside contributions
-  will need a CLA or DCO decision before they are merged.
+- License **AGPL-3.0-only**: a modified sync server offered to others
+  must publish its changes. Outside contributions need a CLA or DCO
+  decision before the first one is merged.
 - **Build on the developer's machine, never on the server.** A server only
   receives a binary (`bin/deploy`) or an image; releases are built on
   Ubuntu 22.04 runners so the binaries need only glibc 2.35.
@@ -70,12 +111,12 @@ is written into `docs/design.md`, dated, with what it replaced.
   redacted `Debug`.
 - Every change to the vault format bumps its version; old versions stay
   readable until explicitly dropped.
-- **Two things keep the project's old name, `strongbox`, on purpose and
-  must never be "fixed"**: the domain labels of the cryptography
+- **Two things carry the project's earlier name, `strongbox`, on purpose
+  and must never be "fixed"**: the domain labels of the cryptography
   (`"strongbox v1 wrap"`, `"strongbox v1 item"` and the rest) and the
   `SB1-` prefix of the Secret Key. Both are inputs to key derivation or
   printed on Emergency Kits; changing either makes existing vaults and
-  kits unreadable. The story is in `docs/design.md`, Name.
+  kits unreadable (`docs/design.md`, Name).
 
 ## Layout
 
@@ -85,7 +126,7 @@ project.
 | Crate | Binary | Role |
 |---|---|---|
 | `crates/core` (`passforme-core`) | — | `generator`, `kdf`, `seal`, `item` (the fields and their JSON), `kit` (Secret Key text), `vault` (file format, unlocked vault). **No I/O.** |
-| `crates/cli` (`passforme`) | `passforme` | The client on the laptop. The only place where the vault is ever decrypted. |
+| `crates/cli` (`passforme`) | `passforme` | The client, on the user's computer. The only place where the vault is ever decrypted. |
 | `crates/server` (`passforme-server`) | `passforme-server` | Sync server, on a machine of the user's. Stores ciphertext only; holds no key able to decrypt it. |
 
 ## Other files
@@ -103,26 +144,6 @@ project.
 ## Website
 
 The home page, the command guide and the brand kit of `passforme.com`
-live in their own repository since 2026-11-01:
-[passforme/website](https://github.com/passforme/website), with its own
-`AGENTS.md` (until then they were `site/` here). The rule that crosses
-the two: **a change to a command or option is followed by the guide's
-update there**, and noted in `CHANGELOG.md` here.
-
-## Project plans (domain, accounts, release)
-
-The domain `passforme.com` (registered 2026-10-17) and the GitHub org
-`passforme` belong to the project, with their own Cloudflare and Zoho
-Mail accounts (`hello@passforme.com`, also the address of
-`SECURITY.md`), apart from the owner's personal ones. How those accounts
-are operated, and what an agent may touch in them, is the owner's
-business and lives in `AGENTS.local.md`. The one rule that concerns
-everyone: an agent never holds an account's login, only a scoped token
-handed to it by `passforme unlock`, and anything that costs money needs
-the owner's approval.
-
-Open source under AGPL-3.0-only since 2026-10-31, when the repository
-was audited for publication (license, README, CHANGELOG, CI and release
-workflows, `bin/deploy`, `docs/`, `install.sh`, `SECURITY.md`). An
-Enterprise edition may follow, which is why outside contributions need
-a CLA or DCO decision before the first one is merged.
+are in [passforme/website](https://github.com/passforme/website), with
+its own `AGENTS.md`. **A change to a command or option here is followed
+by the guide's update there.**

@@ -17,9 +17,9 @@ as a `CryptoRng` argument and never opens it itself.
    (`SHA-256("strongbox v1 kit" ‖ key)`), so a key typed back from paper is
    either right or refused (every single-digit typo is caught in the tests).
    Reading accepts any case, O for 0, I/L for 1, with or without hyphens.
-2. **Master key** (`crates/core/src/kdf.rs`, **done**):
+2. **Master key** (`crates/core/src/kdf.rs`):
    `pw_key = Argon2id(NFKC(master_password), salt, m = 256 MiB, t = 3, p = 1, 32 bytes)`
-   (about 0.6 s on the laptop), then
+   (about 0.6 s on a laptop), then
    `master_key = HKDF-Extract-SHA256(salt = account_id, ikm = pw_key ‖ secret_key)`.
    The Argon2 parameters are stored with the account so they can be raised,
    and `KdfParams::new` only accepts 64 MiB..=4 GiB, 2..=64 passes and
@@ -51,7 +51,7 @@ as a `CryptoRng` argument and never opens it itself.
      wiped on drop and print as `[REDACTED]`. Stack copies made inside
      dependencies cannot be reached; wiping is best effort, as with any Rust
      code.
-4. **Vault key wrapping** (`crates/core/src/seal.rs`, **done**): `vault_key`
+4. **Vault key wrapping** (`crates/core/src/seal.rs`): `vault_key`
    encrypted with XChaCha20-Poly1305 under `wrap_key`, random 24-byte nonce,
    AAD = `"strongbox v1 vault-key" ‖ account_id`.
 
@@ -64,7 +64,7 @@ as a `CryptoRng` argument and never opens it itself.
    password is changed because it leaked. With rotation an old password opens
    old copies only, as they were. The CLI also deletes `vault.json.bak` after
    the change, since it would open with the old password.
-5. **Items** (**done**): padded, encrypted with XChaCha20-Poly1305 under
+5. **Items**: padded, encrypted with XChaCha20-Poly1305 under
    `vault_key`, fresh random nonce per write, AAD =
    `"strongbox v1 item" ‖ account_id ‖ item_id ‖ revision (u64 BE)`. Random
    192-bit nonces make reuse negligible without any counter state. Items are
@@ -98,7 +98,7 @@ as a `CryptoRng` argument and never opens it itself.
      Serving an old revision *with* its old number is the whole-vault
      rollback in the threat model, handled at sync level.
 
-6. **Authentication to the server** (**done**, decided 2026-09-29): the client
+6. **Authentication to the server**: the client
    sends `auth_key` as `Authorization: Bearer` over HTTPS and the server stores
    only `SHA-256("strongbox v1 auth-hash" ‖ auth_key)`, compared in constant
    time. A fast hash is enough because the key is 256 bits derived from the

@@ -1,22 +1,19 @@
 # How passforme works, and why
 
 Everything about passforme that is not in the code: what each part is
-for, every command, and the reasoning behind each decision, with the
-date it was taken and what was rejected. Written so that a person, or
-the agent they hand it to, gets the whole picture from this one file.
+for, every command, and the reasoning behind each decision, including
+what was rejected. Written so that a person, or the agent they hand it
+to, gets the whole picture from this one file.
 [`AGENTS.md`](../AGENTS.md) holds the rules and the layout and points
 here; [`threat-model.md`](threat-model.md) and
 [`cryptography.md`](cryptography.md) hold the security design and are
 required reading before touching anything that handles a secret.
 
-Decisions are recorded when they are taken, so later sections may refine
-earlier ones; the date says which is current.
-
 ## Name
 
-The project was called `strongbox` until 2026-10-17, when it became
-`passforme` (another password manager already used the old name). Two
-things keep the old name **on purpose** and must never be "fixed": the
+The project began as `strongbox` and was renamed because another
+password manager already used that name. Two things keep the earlier
+name **on purpose** and must never be "fixed": the
 domain labels of the cryptography (`"strongbox v1 wrap"`, `"strongbox v1
 item"` and the rest, listed in `cryptography.md`), which are inputs to key derivation and
 encryption, and the `SB1-` prefix of the Secret Key, printed on every
@@ -29,10 +26,9 @@ unreadable.
 (`log2` of the number of equally likely outputs):
 
 - **Random characters:** length 4..=1024, classes lowercase, uppercase,
-  digits and the 32 ASCII symbols. **Default since 2026-10-17: 29 letters
-  and digits, no symbols (172.6 bits)**, the style the user liked in
-  Contabo's generator (`DOz8kNqus39NRlzgUDAgQyKnMXf2B`): stronger than the
-  old default (24 with symbols, 157.2 bits), and nothing that breaks in a
+  digits and the 32 ASCII symbols. **Default: 29 letters and digits, no
+  symbols (172.6 bits)**, in the style of `DOz8kNqus39NRlzgUDAgQyKnMXf2B`:
+  stronger than 24 characters with symbols (157.2 bits), and nothing that breaks in a
   form, a shell or a URL, or stops a double-click from selecting it.
   `--symbols` adds them for sites that demand one. Optionally without
   ambiguous characters (`Il1|O0o'"` and backtick).
@@ -44,8 +40,8 @@ unreadable.
   (`addd3553…b903e`, the file from eff.org and an independent mirror were
   byte-identical). Four words contain a hyphen; none has both halves in the
   list, so `-` never makes two passphrases equal (a test keeps it so).
-- **Passphrases in Brazilian Portuguese** (2026-10-17, asked for by the user:
-  a scene is easier to picture and remember in one's own language): the
+- **Passphrases in Brazilian Portuguese** (a scene is easier to picture
+  and remember in one's own language): the
   BIP-39 Portuguese wordlist, the one Bitcoin wallets use for recovery
   phrases, embedded verbatim and pinned by SHA-256 (`2685e9c1…7d79cd3f`;
   `bitcoin/bips` and Trezor's `python-mnemonic` were byte-identical). 2048
@@ -70,9 +66,8 @@ Decisions and why:
 
 ## The CLI (`passforme`)
 
-Install on the laptop from the checkout: `cargo install --path crates/cli
---locked`. Everyone else: `install.sh` at the root (the README's one
-line), which downloads the latest release for the machine, checks its
+Install from a checkout: `cargo install --path crates/cli --locked`.
+Everyone else: `install.sh` at the root (the README's one line), which downloads the latest release for the machine, checks its
 `.sha256` and installs `passforme` and `pfm` into `~/.local/bin`; it
 depends on the archive names that `release.yml` produces, so the two
 change together.
@@ -104,23 +99,22 @@ passforme status                    # session, agent (locked / time left / no li
 passforme completions bash          # Tab completion script (sourced from ~/.bashrc)
 ```
 
-**Long options only** (2026-10-21, asked for by the user: `-u` beside
-`--url` and `--kind` with a short form in `add` but not in `edit` made the
-options hard to remember). Every option is spelled out (`--username`,
-`--generate`, `--symbols`); only `-h` stays. Short forms typed from habit
-(`-u -g -k -s -l -w -f`) and `edit --field`/`--secret-field` (renamed to
+**Long options only** (`-u` beside `--url`, and a short form for `--kind`
+in one command but not another, make options hard to remember). Every
+option is spelled out (`--username`, `--generate`, `--symbols`); only
+`-h` stays. Short forms typed from habit (`-u -g -k -s -l -w -f`), and
+`--field`/`--secret-field` in `edit` (where the names are
 `--set-field`/`--set-secret-field`, since `--field` in `get` means "which
-field to copy") are answered with their new name and exit 2, before clap
-parses anything. The typing is paid back by Tab completion
-(`clap_complete`, the only new dependency): `completions bash` prints the
-script for both `passforme` and `pfm`, kinds included (`--kind` takes the
-names from `Kind::ALL`, so a wrong kind also gets the list). The laptop's
-`~/.bashrc` sources it at start (0.15 s for an interactive bash), so it
-always matches the installed binary; the `bash-completion` package is not
-needed.
+field to copy"), are answered with the right name and exit 2, before
+clap parses anything. The typing is paid back by Tab completion
+(`clap_complete`): `completions bash` prints the script for both
+`passforme` and `pfm`, kinds included (`--kind` takes the names from
+`Kind::ALL`, so a wrong kind also gets the list). Sourcing it from
+`~/.bashrc` (0.15 s for an interactive bash) keeps it matching the
+installed binary; the `bash-completion` package is not needed.
 
-**No option is ignored** (2026-10-22, after `add X --symbols` without
-`--generate` silently asked for a password). Generator options in `add`
+**No option is ignored** (`add X --symbols` without `--generate` must
+not silently ask for a password). Generator options in `add`
 and `edit` need `--generate`; character options (`--length`, `--symbols`,
 `--no-*`, `--avoid-ambiguous`) conflict with `--words`, and `--lang` and
 `--separator` require it (clap rules, so they are refused before any
@@ -134,8 +128,8 @@ password; `edit --generate` refuses the same kinds.
 be part of exactly one title. Commands that read the vault ask for the
 master password, unless a **session** is open (below).
 
-**Session** (2026-10-17, `crates/cli/src/keeper.rs`, asked for by the user:
-typing a long phrase for every lookup was too much). Like `sudo`, the
+**Session** (`crates/cli/src/keeper.rs`; typing a long phrase for every
+lookup is too much). Like `sudo`, the
 master password typed at a terminal opens a session, and the next commands
 at a terminal do not ask again until the vault sits unused for 15 minutes
 (each use starts the time again), a screen locker runs, or `passforme lock`.
@@ -175,23 +169,22 @@ Decisions and why:
 - A broken config file is reported and means no session, never a silent
   default: a typo (`sesion = 1h`) is an error.
 
-Tested 2026-10-17 in a pty with throwaway dirs: typed once → next command
+Tested in a pty with throwaway dirs: typed once → next command
 asks nothing; piped command and `get --stdout` without a terminal ignore
 it; `lock` removes it; wrong password opens none; `session = 3s` expires,
 and each use renews it; a process named `hyprlock` closes it within 2 s;
 `off` and a typo open none. Socket paths must fit in 108 bytes (`SUN_LEN`):
 a test with a long `XDG_RUNTIME_DIR` failed to open a session, harmlessly.
 
-**Kinds of item** (2026-10-17, `crates/core/src/kind.rs`,
-`crates/cli/src/kinds.rs`; the user asked for every kind of password and
-security code to fit). An item has a `kind`; each kind is a template —
+**Kinds of item** (`crates/core/src/kind.rs`, `crates/cli/src/kinds.rs`;
+every kind of password and security code should fit). An item has a `kind`; each kind is a template —
 which slots to ask for, in which order, under which labels — over the same
 `Item`: the common slots (`username`, `password`, `urls`, `totp`, `notes`)
 relabelled ("PIN", "Key", "Words", "Number"), plus named extra fields.
 
 | Kind | Asks for |
 |---|---|
-| `login` (default) | as before: secret typed twice, username and URLs from the command line |
+| `login` (default) | secret typed twice, username and URLs from the command line |
 | `note` | text |
 | `recovery-codes` | account, URL, codes (one per line, may contain spaces) |
 | `recovery-phrase` | account, URL, words (BIP-39 checked when its length fits; kept as typed otherwise) |
@@ -212,12 +205,12 @@ Decisions and why:
   `edit --kind` relabels an item without touching its data (e.g. one added
   with `add-many` that is really a PIN). Nothing is lost if a template
   changes: `show` lists the template's slots in order, then everything else.
-- **No format bump.** `kind` and `codes` are new optional JSON members:
-  items written before read as `login` with no codes (tested both ways
-  against the previous binary, which lists new items ignoring their kind).
-  An older client *editing* a new item would drop those members — there is
-  only one client binary, reinstalled on every change. A kind from a newer
-  version reads as `other` and shows like a login.
+- **No format bump.** `kind` and `codes` are optional JSON members: an
+  item without them reads as `login` with no codes, and a client that
+  does not know them lists the item ignoring its kind (tested both ways).
+  Such a client *editing* the item would drop those members, which is
+  acceptable while every device runs the current client. A kind from a
+  newer version reads as `other` and shows like a login.
 - **Recovery codes have storage of their own** (`codes: [{code, used}]`):
   `passforme codes X` copies the next unused one, marks it used, saves and
   syncs, and warns when two or fewer are left. Copying comes first, so a
@@ -235,13 +228,13 @@ Decisions and why:
 - **A private key comes from its file** (`--file`), byte for byte (tested:
   the copied key equals the file): pasting a multi-line key into a hidden
   prompt is unreliable.
-- **`recovery-phrase`** (2026-10-26, for Proton's recovery phrase, which
-  `crypto-seed` fitted only with "Wallet" and "Network" left empty). A
+- **`recovery-phrase`** (a service's recovery phrase, Proton's for one,
+  fits `crypto-seed` only with "Wallet" and "Network" left empty). A
   service's phrase may or may not be BIP-39: it is checked only when its
   word count is one BIP-39 uses, a failure asks before saving (some
   services use the same lengths without BIP-39), and any other phrase is
   kept exactly as typed — only a phrase that checks is normalized.
-- **Attachments** (2026-10-26, for Proton's recovery file): `edit --attach`
+- **Attachments** (for a service's recovery file, Proton's for one): `edit --attach`
   keeps small files inside the item (`attachments: [{name, data}]`, data
   in standard base64), sealed with it like every other field; `get
   --attachment NAME [--output PATH]` writes one back with `create_new` and
@@ -272,7 +265,7 @@ Decisions and why:
 - **`harden()` at start**: `RLIMIT_CORE` 0 and `PR_SET_DUMPABLE` 0, so a
   crash never writes the decrypted vault to a core file, and no other process
   of the same user can `ptrace` it or read its `/proc/<pid>/mem`.
-- **Clipboard via `wl-copy`/`wl-paste`** (Wayland; Hyprland on the laptop),
+- **Clipboard via `wl-copy`/`wl-paste`** (Wayland),
   the secret written to `wl-copy`'s stdin. Clearing after 30 s is done by a
   detached child of the binary (`passforme __clear-clipboard`, own process
   group so Ctrl-C does not kill it), which receives the SHA-256 of the secret
@@ -281,8 +274,7 @@ Decisions and why:
   command line (a hash of a weak password can be brute-forced).
 - **Clipboard history managers defeat the 30 s clearing**: `cliphist`,
   `clipman` and the like store every copy on disk, passwords included.
-  None ran on the laptop on 2026-09-28; check before adding one, and exclude
-  `passforme` copies from it.
+  Check before installing one, and exclude `passforme` copies from it.
 - **Minimum 12 characters** for the master password: the Secret Key makes a
   stolen *server* copy unguessable, but a stolen *laptop* has the Secret Key
   file next to the vault, and then only the master password and Argon2 stand
@@ -303,8 +295,8 @@ Decisions and why:
 
 ## Unlock agent (for programs that need a secret)
 
-Asked for on 2026-09-30 so that a program can read its API keys through a
-`key_command`, which runs without a terminal and with an empty stdin.
+Exists so that a program can read its API keys through a `key_command`,
+which runs without a terminal and with an empty stdin.
 Code in `crates/cli/src/agent.rs`.
 
 ```toml
@@ -335,8 +327,7 @@ passforme lock                       # or wait for the time to run out
   the user, socket 0600), peer uid checked with `SO_PEERCRED`. On `lock`,
   when its time is up (1 s to 7 d, default 8 h), or when its socket is gone
   or replaced it wipes the items and exits; a watcher checks every 30 s.
-- **`--for forever`** (asked for on 2026-09-30: a program must not stop working
-  every 8 h): no time limit, so the marked items stay readable by this user's
+- **`--for forever`** (a program must not stop working every 8 h): no time limit, so the marked items stay readable by this user's
   programs until `lock`, a reboot or a logout — the same exposure as the
   timed mode, for longer, and still never on disk. A reboot always needs a
   new `unlock` with the master password; avoiding that would mean storing
@@ -359,14 +350,14 @@ passforme lock                       # or wait for the time to run out
   selection it stays out; an emptied selection locks the agent. The agent
   itself accepts no new values from anyone — only a command that has just
   opened the vault with the master password starts a new one. An agent
-  started by an older binary (no selection in its status) is treated as
-  "every marked item"; tested.
+  whose status carries no selection is treated as "every marked item";
+  tested.
 - `unlock` syncs first when linked. `status` lists what the agent holds and
   for how long.
 - Rejected: implementing the freedesktop Secret Service (D-Bus). Any program
   of the session could ask it for anything, and it is far more code.
 
-Tested on 2026-09-30, called the way a `key_command` is (`setsid -w env -i … </dev/null`):
+Tested, called the way a `key_command` is (`setsid -w env -i … </dev/null`):
 locked → fails in 3 ms; unlocked → exact value, no newline; unmarked item
 refused while unlocked; socket 0600 in a 0700 directory; agent's
 `/proc/<pid>/environ` unreadable; 3.7 MB; `lock` and the time limit both
@@ -416,7 +407,7 @@ password, and from then on uses it. **Password changed here** while linked:
 `passwd` syncs first, rotates, and uploads with the old auth key plus the
 new one; nothing is saved locally unless the server accepted it.
 
-Tested end to end on 2026-09-29 with a local server and two devices: register
+Tested end to end with a local server and two devices: register
 (wrong invite refused, invite single-use), login (wrong password refused),
 changes both ways, conflict copy, rollback and silent tampering refused,
 password change carried to the other device, offline change pushed later, and
@@ -431,10 +422,9 @@ with **`bin/deploy`**: it builds `passforme-server` here, copies it and
 the unit to `DEPLOY_HOST`, installs both with `sudo`, restarts the service
 and checks that `DEPLOY_URL` answers `/api/v1/prelogin`. Host, ssh options
 and URL live in `config/deploy.env` (ignored by Git;
-`config/deploy.env.example` documents it). Kept on systemd rather than
-Docker Compose, the usual shape of the owner's services (decided 2026-10-31):
-one static binary in a small VM gains nothing from a daemon and a
-registry, and would lose the unit's confinement. **For others, both**:
+`config/deploy.env.example` documents it). Systemd rather than Docker
+Compose: one static binary in a small VM gains nothing from a daemon and
+a registry, and would lose the unit's confinement. **For others, both**:
 every release also publishes `ghcr.io/passforme/passforme-server`
 (amd64, arm64) from the same binaries, never rebuilt (`Dockerfile`,
 `contrib/compose.yml`, non-root, read-only, no capabilities). How to
@@ -448,32 +438,28 @@ loopback (`IPAddressDeny=any`, `IPAddressAllow=localhost`), 64 MB, no
 capabilities: `systemd-analyze security` 1.1. Invite, on the server:
 `sudo -u passforme passforme-server --data /var/lib/passforme invite`.
 
-## Roadmap
+## Next
 
-1. `core`: generator, key derivation, item encryption (**all done**) — with tests,
-   including known-answer vectors for the primitives and tamper tests (a
-   flipped bit, a swapped item, a changed revision must all fail to decrypt).
-2. `cli`, local only: `init`, `generate`, `add`, `list`, `show`, `get`,
-   `rm`, `edit`, `totp`, `passwd` (**done**), and the scoped unlock agent
-   (**done**, 2026-09-30).
-3. `server` and `sync` (**done**), deployed on the owner's server since 2026-09-29.
-4. **Web client served by the sync server** (decided by the user on 2026-09-29),
-   for the phone and emergencies; the laptop keeps using the CLI. It decrypts
-   in the browser (`core` compiled to WASM), so whoever serves the page could
-   serve one that steals the master password: the weakness of every web
-   vault (Bitwarden's included), accepted for the convenience. The disk
-   encryption of the servers does not help here — it covers physical access
-   to a powered-off machine, while this risk is a remote compromise of a
-   running VM. Mitigations, all part of the plan:
-   - the server reachable only through `tailscale serve`, nothing on the LAN;
-   - the VM runs only `passforme-server`; the page is embedded in that binary,
-     built on the laptop, with no third-party code and a strict CSP;
-   - the laptop never uses the web client, so it never trusts code from the VM;
-   - a watcher on the laptop fetches the served page periodically, compares it
-     byte for byte with the build, and alerts on Telegram if it differs;
-   - the server still holds only ciphertext.
-   Rejected for now: a native phone app (Android sideloading is doable, iPhone
-   needs a paid developer account) and a browser extension (autofill; maybe
-   later). Rule regardless of client: **no code that decrypts is delivered by
-   the server without a signature made off the server**, except this web
-   client, by the decision above.
+**A web client served by the sync server**, for the phone and
+emergencies; the computer keeps the CLI. It decrypts in the browser
+(`core` compiled to WASM), so whoever serves the page could serve one
+that steals the master password: the weakness of every web vault
+(Bitwarden's included), accepted for the convenience. The disk
+encryption of the server does not help here: it covers physical access
+to a powered-off machine, while this risk is a remote compromise of a
+running one. Mitigations, all part of the plan:
+
+- the server reachable only through `tailscale serve`, nothing on the LAN;
+- the machine runs only `passforme-server`; the page is embedded in that
+  binary, built elsewhere, with no third-party code and a strict CSP;
+- the computer that builds it never uses the web client, so it never
+  trusts code from the server;
+- a watcher on that computer fetches the served page periodically,
+  compares it byte for byte with the build, and alerts if it differs;
+- the server still holds only ciphertext.
+
+Rejected for now: a native phone app (Android sideloading is doable,
+iPhone needs a paid developer account) and a browser extension
+(autofill; maybe later). Rule regardless of client: **no code that
+decrypts is delivered by the server without a signature made off the
+server**, except this web client, by the decision above.

@@ -18,7 +18,7 @@ Not protected against (accepted):
 - **Malware on the laptop while the vault is unlocked.** A client with the
   keys in memory can be read by anything running as the same user.
 - **A malicious server withholding data:** it can refuse to serve, or serve an
-  older copy of the whole vault (rollback). Mitigation planned: the client
+  older copy of the whole vault (rollback). Mitigation: the client
   remembers the highest vault revision it has seen and refuses to go back.
 - **Losing both the master password and the Secret Key** (or the Emergency
   Kit): there is no recovery, by design.

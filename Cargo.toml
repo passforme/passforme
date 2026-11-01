@@ -22,7 +22,7 @@ must_use_candidate = "allow"
 # The panics left are `expect`s on internal invariants, each with its reason.
 missing_panics_doc = "allow"
 
-# The server binary is built on the laptop and copied to the VM: small and stripped.
+# The server binary is built here and copied to the server: small and stripped.
 [profile.release]
 lto = true
 codegen-units = 1

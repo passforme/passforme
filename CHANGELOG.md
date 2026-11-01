@@ -34,9 +34,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   release for the machine, checks its checksum and installs `passforme`
   and `pfm` into `~/.local/bin`.
 
-### Security
-
-- Dependencies updated past RUSTSEC-2026-0346 to 0349, 0381, 0382 and
-  0385 (rustls, webpki, ctutils); the minimum Rust version is now 1.87.
-
 [Unreleased]: https://github.com/passforme/passforme/commits/main

@@ -106,8 +106,7 @@ pub struct PasswordSpec {
     pub avoid_ambiguous: bool,
 }
 
-/// Letters and digits, 29 characters: the style the user liked in
-/// Contabo's generator (2026-10-17). 172.6 bits, more than 24 characters
+/// Letters and digits, 29 characters: 172.6 bits, more than 24 characters
 /// with symbols (157.2), and nothing that breaks in a form, a shell or a URL,
 /// or stops a double-click from selecting it. Symbols are opt-in, for sites
 /// that demand one.
