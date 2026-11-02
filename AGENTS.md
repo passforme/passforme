@@ -139,7 +139,6 @@ project.
 | `bin/deploy`, `config/deploy.env.example` | Ships `passforme-server` to a machine of the user's over SSH (systemd unit in `contrib/`); settings in the ignored `config/deploy.env`. |
 | `Dockerfile`, `contrib/compose.yml` | The `ghcr.io/passforme/passforme-server` image, packaged from the release binaries, never rebuilt. |
 | `docs/self-hosting.md` | How anyone runs the sync server, systemd or Docker, Tailscale recommended. |
-| `docs/brand/` | The two logos the README shows, copied from the brand kit in [passforme/website](https://github.com/passforme/website) (`site/brand/logo/`), where they are generated; when the kit changes, copy them again. |
 | `tools/*_reference.py` | Independent Python implementations the cryptography and TOTP tests are checked against. |
 | `CONTRIBUTING.md` | What a contributor reads first: issue before code, the rules in short, DCO sign-off. |
 | `SECURITY.md` | How to report a vulnerability (`security@passforme.com`); only the latest release gets fixes. |

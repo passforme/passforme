@@ -1,12 +1,20 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/brand/logo-gold-on-dark.svg">
-    <img src="docs/brand/logo-brass-on-light.svg" alt="passforme" width="440">
+    <source media="(prefers-color-scheme: dark)" srcset="https://passforme.com/brand/logo/logo-gold-on-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="https://passforme.com/brand/logo/logo-brass-on-light.svg">
+    <img src="https://passforme.com/brand/logo/logo-gold.svg" alt="passforme" width="440">
   </picture>
   <br>
   <strong>A password vault only you can open.</strong>
   <br>
   <sub>Terminal first &middot; synced by a server you run &middot; the server sees only ciphertext</sub>
+</p>
+
+<p align="center">
+  <a href="https://crates.io/crates/passforme"><img src="https://img.shields.io/crates/v/passforme.svg?label=crates.io&color=8a5a12" alt="passforme on crates.io"></a>
+  <a href="https://github.com/passforme/passforme/releases"><img src="https://img.shields.io/github/v/release/passforme/passforme?label=release&color=8a5a12" alt="Latest release"></a>
+  <a href="https://github.com/passforme/passforme/actions/workflows/ci.yml"><img src="https://github.com/passforme/passforme/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-8a5a12.svg" alt="License: AGPL-3.0"></a>
 </p>
 
 A password vault that only you can open, kept in sync between your devices
