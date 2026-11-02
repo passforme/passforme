@@ -4,10 +4,12 @@ description = "Sync server: stores ciphertext only and holds no decryption key"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
-publish.workspace = true
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true
+readme = "README.md"
+keywords = ["password-manager", "sync", "server", "self-hosted", "zero-knowledge"]
+categories = ["web-programming::http-server", "authentication"]
 
 [dependencies]
 axum = { version = "0.8.9", default-features = false, features = ["http1", "json", "tokio"] }
@@ -17,7 +19,7 @@ getrandom = { version = "0.4.3", features = ["sys_rng"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
 sha2 = "0.11.0"
-passforme-core = { path = "../core" }
+passforme-core = { path = "../core", version = "0.1.0" }
 tokio = { version = "1.53.1", features = ["rt-multi-thread", "macros", "net", "signal", "sync"] }
 
 [lints]

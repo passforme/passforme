@@ -6,7 +6,6 @@ members = ["crates/core", "crates/cli", "crates/server"]
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.87"
-publish = false
 license = "AGPL-3.0-only"
 repository = "https://github.com/passforme/passforme"
 homepage = "https://passforme.com"

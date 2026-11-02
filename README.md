@@ -62,15 +62,18 @@ ln -s passforme ~/.local/bin/pfm
 The archive also holds `passforme-server`, the optional sync server, and
 its systemd unit.
 
-### From source
+### With cargo
 
-Needs Rust 1.87 or later.
+Needs Rust 1.87 or later. The crates are on
+[crates.io](https://crates.io/crates/passforme); `cargo` builds them on
+your machine and puts the binaries in `~/.cargo/bin`.
 
 ```sh
-git clone https://github.com/passforme/passforme
-cd passforme
-cargo install --path crates/cli --locked     # puts passforme in ~/.cargo/bin
+cargo install passforme --locked            # the client
+cargo install passforme-server --locked     # the sync server, optional
 ```
+
+From a checkout instead: `cargo install --path crates/cli --locked`.
 
 ### Tab completion
 

@@ -94,7 +94,9 @@ is written into `docs/design.md`, dated, with what it replaced.
   `## [X.Y.Z] - date`, bumps `version` in `Cargo.toml`, commits
   `chore(release): vX.Y.Z` and pushes the tag `vX.Y.Z`; `release.yml`
   builds x86_64 and aarch64 Linux tarballs with checksums and uses that
-  section as the release notes. Linux only: the client needs `prctl`,
+  section as the release notes. Then `cargo publish --workspace` puts
+  the three crates on crates.io, in dependency order, with the token
+  the owner keeps in passforme (`crates.io passforme`), never in a file. Linux only: the client needs `prctl`,
   `/proc` and `wl-copy`.
 - License **AGPL-3.0-only**: a modified sync server offered to others
   must publish its changes. Outside contributions are signed off
