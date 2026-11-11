@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The three crates on crates.io: `cargo install passforme` and
   `cargo install passforme-server`.
+- `unlock --writable`: programs can also keep what they create (an AI
+  agent's test accounts, with password, TOTP and recovery codes) through
+  the unlock agent, without the master password: `add --agent-space`,
+  `edit --agent-space`, `list --agent-space`. They can change only the
+  items they added, never yours, and an item of yours always wins a
+  query. The next command that opens the vault brings their items in
+  and syncs them.
+- `codes --stdout` prints the next unused recovery code alone, for
+  programs.
 
 ## [0.1.0] - 2026-11-01
 

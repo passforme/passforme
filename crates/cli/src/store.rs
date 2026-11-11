@@ -12,6 +12,10 @@
 //!   revision seen there (a lower one later means a rollback).
 //! - `sync-base.json` (0600): the vault as of the last sync, the common
 //!   ancestor of the three-way merge. Ciphertext, like `vault.json`.
+//! - `agent-journal` (0600), while a writable unlock agent runs: what
+//!   programs wrote through it, sealed, until a command that opens the
+//!   vault brings it in (`passforme_core::journal`). A journal that could
+//!   not be read whole is kept as `agent-journal.rejected`.
 
 use std::fs::{self, DirBuilder, File, OpenOptions};
 use std::io::{self, Write};
@@ -172,6 +176,51 @@ impl Store {
             .map_err(|e| Error::Io(tmp.clone(), e))?;
         fs::rename(&tmp, &path).map_err(|e| Error::Io(path, e))?;
         sync_dir(&self.dir)
+    }
+
+    pub fn journal_path(&self) -> PathBuf {
+        self.dir.join("agent-journal")
+    }
+
+    /// The agent journal, locked against the agent's appends for as long
+    /// as the file returned is open, and its text. `None` without one.
+    pub fn lock_journal(&self) -> Result<Option<(File, String)>> {
+        use std::io::Read;
+        let path = self.journal_path();
+        let mut file = match File::open(&path) {
+            Ok(file) => file,
+            Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(None),
+            Err(e) => return Err(Error::Io(path, e)),
+        };
+        rustix::fs::flock(&file, rustix::fs::FlockOperation::LockExclusive)
+            .map_err(|e| Error::Io(path.clone(), e.into()))?;
+        let mut text = String::new();
+        file.read_to_string(&mut text)
+            .map_err(|e| Error::Io(path, e))?;
+        Ok(Some((file, text)))
+    }
+
+    /// Starts a new journal with `head` as its first line, replacing any
+    /// other: an agent still appending to the old one notices and stops.
+    pub fn start_journal(&self, head: &str) -> Result<()> {
+        self.create_dir()?;
+        self.write_atomic("agent-journal", format!("{head}\n").as_bytes())
+    }
+
+    pub fn remove_journal(&self) -> Result<()> {
+        let path = self.journal_path();
+        match fs::remove_file(&path) {
+            Err(e) if e.kind() != io::ErrorKind::NotFound => Err(Error::Io(path, e)),
+            _ => sync_dir(&self.dir),
+        }
+    }
+
+    /// Keeps a copy of a journal that could not be read whole, and says
+    /// where.
+    pub fn keep_rejected_journal(&self) -> Result<PathBuf> {
+        let kept = self.dir.join("agent-journal.rejected");
+        fs::copy(self.journal_path(), &kept).map_err(|e| Error::Io(kept.clone(), e))?;
+        Ok(kept)
     }
 
     /// Deletes `vault.json.bak`, if any.

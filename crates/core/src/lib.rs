@@ -69,6 +69,7 @@ pub mod api;
 pub mod bip39;
 pub mod generator;
 pub mod item;
+pub mod journal;
 pub mod kdf;
 pub mod kind;
 pub mod kit;

@@ -49,12 +49,36 @@ impl Session {
                 }
             }
         }
-        Ok(Self {
+        let mut session = Self {
             store,
             vault,
             secret_key,
             password,
-        })
+        };
+        session.import_journal()?;
+        Ok(session)
+    }
+
+    /// Brings in what programs wrote through a writable agent since the
+    /// last command, and syncs it like any other change.
+    fn import_journal(&mut self) -> Result<()> {
+        if crate::settle_agent(self, crate::Restart::IfWaiting)?.imported {
+            self.sync_or_warn();
+        }
+        Ok(())
+    }
+
+    pub(crate) fn sync_or_warn(&mut self) {
+        match self.store.sync_state() {
+            Ok(None) => {}
+            Ok(Some(_)) => match sync::sync(self) {
+                Ok(summary) => summary.print(),
+                Err(e) => eprintln!(
+                    "Saved on this device, but the sync failed: {e}\nRun `passforme sync` later."
+                ),
+            },
+            Err(e) => eprintln!("Saved on this device, but not synced: {e}"),
+        }
     }
 
     /// Saves a change on this device and, when the vault is linked to a
@@ -62,17 +86,12 @@ impl Session {
     /// and goes up with the next `passforme sync`.
     pub fn commit(mut self) -> Result<()> {
         self.store.save_vault(self.vault.file())?;
-        if self.store.sync_state()?.is_some() {
-            match sync::sync(&mut self) {
-                Ok(summary) => summary.print(),
-                Err(e) => eprintln!(
-                    "Saved on this device, but the sync failed: {e}\nRun `passforme sync` later."
-                ),
-            }
-        }
-        match crate::refresh_agent(&self.vault) {
-            Ok(Some(message)) => eprintln!("{message}"),
-            Ok(None) => {}
+        self.sync_or_warn();
+        // A running agent is rebuilt from the vault; what programs wrote
+        // through it meanwhile comes in first, and then goes up too.
+        match crate::settle_agent(&mut self, crate::Restart::Refresh) {
+            Ok(settled) if settled.imported => self.sync_or_warn(),
+            Ok(_) => {}
             Err(e) => eprintln!("Could not refresh the agent ({e}); run `passforme unlock`."),
         }
         Ok(())

@@ -22,7 +22,7 @@ passforme generate [--length 32] [--symbols] [--avoid-ambiguous] [--words 6 [--l
 passforme add TITLE [--username USER] [--url URL]... [--generate [generator options]]
 passforme add TITLE --kind KIND [--file PATH]   # card, pin, crypto-seed…: asks for each field
 passforme kinds                     # the kinds and what each holds
-passforme codes QUERY [--list]      # copy the next unused recovery code, mark it used
+passforme codes QUERY [--list | --stdout]  # copy (or print) the next unused recovery code, mark it used
 passforme add-many                  # label + secret, repeated; vault opened once, saved per item
 passforme list                      # table: user, URL, AGENT, what else it holds (no secrets)
 passforme show QUERY [--reveal]     # secrets masked unless --reveal
@@ -36,8 +36,10 @@ passforme edit QUERY [--title T] [--username USER] [--url URL] [--rm-url URL]
                      [--codes] [--kind KIND] [--attach PATH] [--rm-attachment NAME]
 passforme totp QUERY                # current code; `get --field totp` copies it
 passforme passwd                    # new master password, vault key rotated
-passforme unlock [--for 8h|forever] [ITEM…]  # marked items (all, or the ones named) to the agent
+passforme unlock [--for 8h|forever] [--writable] [ITEM…]  # marked items (all, or the ones named) to the agent
 passforme get QUERY --stdout        # value alone on stdout, for programs
+passforme add TITLE --agent-space … # for programs, through a writable agent: also
+                                    # `edit QUERY --agent-space …`, `list --agent-space`
 passforme lock                      # close the session and empty the agent now
 passforme status                    # session, agent (locked / time left / no limit), sync link
 passforme completions bash          # Tab completion script (sourced from ~/.bashrc)
@@ -49,7 +51,8 @@ command at a terminal asks for the master password and opens a session;
 the next ones do not ask until the vault sits unused for 15 minutes, a
 screen locker runs, or `passforme lock`. Programs without a terminal use
 the unlock agent (`unlock`, then `get --stdout`), which holds only the
-items marked `--agent`. The sync server is optional:
+items marked `--agent`; unlocked `--writable`, they can also add items
+with `--agent-space` and change the ones they added, never the owner's. The sync server is optional:
 
 ```
 passforme register URL   # put this vault on an empty server (asks for the invite)
@@ -94,7 +97,10 @@ is written into `docs/design.md`, dated, with what it replaced.
   `## [X.Y.Z] - date`, bumps `version` in `Cargo.toml`, commits
   `chore(release): vX.Y.Z` and pushes the tag `vX.Y.Z`; `release.yml`
   builds x86_64 and aarch64 Linux tarballs with checksums and uses that
-  section as the release notes. Then `cargo publish --workspace` puts
+  section as the release notes. **The number follows SemVer as it is
+  read below 1.0:** only fixes under `[Unreleased]` make a patch
+  (`0.1.1`); a new command, option or behaviour, or anything
+  incompatible, makes a minor (`0.2.0`). Then `cargo publish --workspace` puts
   the three crates on crates.io, in dependency order, with the token
   the owner keeps in passforme (`crates.io passforme`), never in a file. Linux only: the client needs `prctl`,
   `/proc` and `wl-copy`.

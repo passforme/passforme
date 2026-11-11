@@ -25,3 +25,15 @@ print(f'ITEM_REFERENCE = "{item.hex()}"')
 vk_aad = b"strongbox v1 vault-key" + ACCOUNT
 vk = seal(bytes([0x57]) * 32, bytes([0x31]) * 24, vk_aad, bytes([0x42]) * 32)
 print(f'VAULT_KEY_REFERENCE = "{vk.hex()}"')
+
+# The agent journal: its key wrapped under the vault key, one entry sealed
+# under the journal key at place 5.
+JOURNAL = bytes([0x6A]) * 16
+jk_aad = b"strongbox v1 journal-key" + ACCOUNT + JOURNAL
+jk = seal(bytes([0x42]) * 32, bytes([0x51]) * 24, jk_aad, bytes([0x4A]) * 32)
+print(f'JOURNAL_KEY_REFERENCE = "{jk.hex()}"')
+
+entry_aad = b"strongbox v1 journal-entry" + ACCOUNT + JOURNAL + struct.pack(">Q", 5)
+entry = seal(bytes([0x4A]) * 32, bytes([0x52]) * 24, entry_aad, pad(b"hunter2"))
+assert len(entry) == 1 + 24 + 256 + 16
+print(f'JOURNAL_ENTRY_REFERENCE = "{entry.hex()}"')

@@ -13,7 +13,12 @@
 //! ```text
 //! vault key: "strongbox v1 vault-key" ‖ account_id
 //! item:      "strongbox v1 item" ‖ account_id ‖ item_id ‖ revision (u64, big-endian)
+//! journal key:   "strongbox v1 journal-key" ‖ account_id ‖ journal_id
+//! journal entry: "strongbox v1 journal-entry" ‖ account_id ‖ journal_id ‖ sequence (u64, big-endian)
 //! ```
+//!
+//! The last two belong to the agent journal (`journal.rs`): its key is
+//! wrapped under the vault key, its entries are sealed under that key.
 //!
 //! So a ciphertext only opens as what it was sealed as: another account's
 //! item, another item, another revision of the same item, or the wrapped vault
@@ -44,6 +49,9 @@ const MIN_BUCKET: usize = 256;
 
 const DOMAIN_VAULT_KEY: &[u8] = b"strongbox v1 vault-key";
 const DOMAIN_ITEM: &[u8] = b"strongbox v1 item";
+const DOMAIN_JOURNAL_KEY: &[u8] = b"strongbox v1 journal-key";
+const DOMAIN_JOURNAL_ENTRY: &[u8] = b"strongbox v1 journal-entry";
+pub const JOURNAL_ID_LEN: usize = 16;
 
 secret_bytes!(
     /// Encrypts every item. Random, generated once per account, stored only
@@ -65,6 +73,42 @@ public_bytes!(
     /// Random identifier of an item, stable across its revisions.
     ItemId,
     ITEM_ID_LEN
+);
+
+secret_bytes!(
+    /// Seals the entries of one agent journal. Random, one per journal,
+    /// stored wrapped by the vault key and held bare only by the unlock
+    /// agent: it says nothing about the vault key.
+    JournalKey,
+    KEY_LEN
+);
+
+impl JournalKey {
+    pub fn generate<R: CryptoRng + ?Sized>(rng: &mut R) -> Self {
+        let mut key = Self::zeroed();
+        rng.fill_bytes(key.expose_mut());
+        key
+    }
+
+    /// From the bytes the unlock agent was handed; `None` unless 32.
+    pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
+        let mut key = Self::zeroed();
+        (bytes.len() == KEY_LEN).then(|| {
+            key.expose_mut().copy_from_slice(bytes);
+            key
+        })
+    }
+
+    /// For handing the key to the unlock agent, and nothing else.
+    pub fn as_bytes(&self) -> &[u8; KEY_LEN] {
+        self.expose()
+    }
+}
+
+public_bytes!(
+    /// Random identifier of one agent journal.
+    JournalId,
+    JOURNAL_ID_LEN
 );
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -183,14 +227,109 @@ pub fn open_item(
         &item_aad(account_id, item_id, revision),
         sealed,
     )?;
-    // Authenticated already, so a bad padding means a bug, not an attack.
+    unpad(&mut plain)?;
+    Ok(plain)
+}
+
+pub fn wrap_journal_key<R: CryptoRng + ?Sized>(
+    journal_key: &JournalKey,
+    vault_key: &VaultKey,
+    account_id: &AccountId,
+    journal_id: &JournalId,
+    rng: &mut R,
+) -> Sealed {
+    seal(
+        vault_key.expose(),
+        random_nonce(rng),
+        &journal_key_aad(account_id, journal_id),
+        journal_key.expose(),
+        KEY_LEN,
+    )
+}
+
+pub fn unwrap_journal_key(
+    sealed: &Sealed,
+    vault_key: &VaultKey,
+    account_id: &AccountId,
+    journal_id: &JournalId,
+) -> Result<JournalKey, SealError> {
+    let plain = open(
+        vault_key.expose(),
+        &journal_key_aad(account_id, journal_id),
+        sealed,
+    )?;
+    JournalKey::from_bytes(&plain).ok_or(SealError::Malformed)
+}
+
+/// Seals one journal entry, padded like an item. `sequence` is its place in
+/// the journal, counted from 0.
+pub fn seal_journal_entry<R: CryptoRng + ?Sized>(
+    journal_key: &JournalKey,
+    account_id: &AccountId,
+    journal_id: &JournalId,
+    sequence: u64,
+    plaintext: &[u8],
+    rng: &mut R,
+) -> Result<Sealed, SealError> {
+    if plaintext.len() > MAX_ITEM_LEN {
+        return Err(SealError::TooLarge {
+            len: plaintext.len(),
+        });
+    }
+    Ok(seal(
+        journal_key.expose(),
+        random_nonce(rng),
+        &journal_entry_aad(account_id, journal_id, sequence),
+        plaintext,
+        padded_len(plaintext.len()),
+    ))
+}
+
+pub fn open_journal_entry(
+    sealed: &Sealed,
+    journal_key: &JournalKey,
+    account_id: &AccountId,
+    journal_id: &JournalId,
+    sequence: u64,
+) -> Result<Zeroizing<Vec<u8>>, SealError> {
+    let mut plain = open(
+        journal_key.expose(),
+        &journal_entry_aad(account_id, journal_id, sequence),
+        sealed,
+    )?;
+    unpad(&mut plain)?;
+    Ok(plain)
+}
+
+/// Strips the ISO/IEC 7816-4 padding of an authenticated plaintext, so a
+/// bad padding means a bug, not an attack.
+fn unpad(plain: &mut Zeroizing<Vec<u8>>) -> Result<(), SealError> {
     let end = plain
         .iter()
         .rposition(|&b| b != 0)
         .filter(|&i| plain[i] == 0x80)
         .ok_or(SealError::Malformed)?;
     plain.truncate(end);
-    Ok(plain)
+    Ok(())
+}
+
+fn journal_key_aad(account_id: &AccountId, journal_id: &JournalId) -> Vec<u8> {
+    [
+        DOMAIN_JOURNAL_KEY,
+        account_id.as_bytes(),
+        journal_id.as_bytes(),
+    ]
+    .concat()
+}
+
+fn journal_entry_aad(account_id: &AccountId, journal_id: &JournalId, sequence: u64) -> Vec<u8> {
+    [
+        DOMAIN_JOURNAL_ENTRY,
+        account_id.as_bytes(),
+        journal_id.as_bytes(),
+        &sequence.to_be_bytes(),
+    ]
+    .concat()
 }
 
 fn vault_key_aad(account_id: &AccountId) -> Vec<u8> {
@@ -480,6 +619,117 @@ mod tests {
         }
     }
 
+    const JOURNAL: JournalId = JournalId::from_bytes([0x6a; 16]);
+
+    fn journal_key(byte: u8) -> JournalKey {
+        JournalKey::from_bytes(&[byte; 32]).unwrap()
+    }
+
+    #[test]
+    fn journal_formats_match_reference() {
+        let wrapped = seal(
+            &[0x42; 32],
+            [0x51; 24],
+            &journal_key_aad(&ACCOUNT, &JOURNAL),
+            &[0x4a; 32],
+            KEY_LEN,
+        );
+        assert_eq!(wrapped.as_bytes(), unhex(JOURNAL_KEY_REFERENCE));
+        let key = unwrap_journal_key(&wrapped, &vault_key(0x42), &ACCOUNT, &JOURNAL).unwrap();
+        assert_eq!(key.as_bytes(), &[0x4a; 32]);
+
+        let entry = seal(
+            &[0x4a; 32],
+            [0x52; 24],
+            &journal_entry_aad(&ACCOUNT, &JOURNAL, 5),
+            b"hunter2",
+            padded_len(7),
+        );
+        assert_eq!(entry.as_bytes(), unhex(JOURNAL_ENTRY_REFERENCE));
+        let opened = open_journal_entry(&entry, &key, &ACCOUNT, &JOURNAL, 5).unwrap();
+        assert_eq!(&opened[..], b"hunter2");
+    }
+
+    #[test]
+    fn journal_key_opens_only_in_its_context() {
+        let wrapped = wrap_journal_key(
+            &journal_key(1),
+            &vault_key(9),
+            &ACCOUNT,
+            &JOURNAL,
+            &mut rng(),
+        );
+        let other_account = AccountId::from_bytes([0xa2; 16]);
+        let other_journal = JournalId::from_bytes([0x6b; 16]);
+        for result in [
+            unwrap_journal_key(&wrapped, &vault_key(8), &ACCOUNT, &JOURNAL),
+            unwrap_journal_key(&wrapped, &vault_key(9), &other_account, &JOURNAL),
+            unwrap_journal_key(&wrapped, &vault_key(9), &ACCOUNT, &other_journal),
+        ] {
+            assert_eq!(result.unwrap_err(), SealError::Rejected);
+        }
+        // Not as an item under the same key, nor as a journal entry.
+        assert_eq!(
+            open_item(&wrapped, &vault_key(9), &ACCOUNT, &ITEM, 0).unwrap_err(),
+            SealError::Rejected
+        );
+        assert_eq!(
+            open_journal_entry(&wrapped, &journal_key(9), &ACCOUNT, &JOURNAL, 0).unwrap_err(),
+            SealError::Rejected
+        );
+        assert_eq!(
+            unwrap_journal_key(&wrapped, &vault_key(9), &ACCOUNT, &JOURNAL)
+                .unwrap()
+                .as_bytes(),
+            &[1; 32]
+        );
+    }
+
+    #[test]
+    fn journal_entry_opens_only_in_its_context() {
+        let key = JournalKey::generate(&mut rng());
+        let sealed =
+            seal_journal_entry(&key, &ACCOUNT, &JOURNAL, 3, b"secret", &mut rng()).unwrap();
+        let other_account = AccountId::from_bytes([0xa2; 16]);
+        let other_journal = JournalId::from_bytes([0x6b; 16]);
+        let other_key = JournalKey::generate(&mut rng());
+        for result in [
+            open_journal_entry(&sealed, &other_key, &ACCOUNT, &JOURNAL, 3),
+            open_journal_entry(&sealed, &key, &other_account, &JOURNAL, 3),
+            open_journal_entry(&sealed, &key, &ACCOUNT, &other_journal, 3),
+            open_journal_entry(&sealed, &key, &ACCOUNT, &JOURNAL, 2),
+            open_journal_entry(&sealed, &key, &ACCOUNT, &JOURNAL, 4),
+        ] {
+            assert_eq!(result.unwrap_err(), SealError::Rejected);
+        }
+        // An item sealed under the same key bytes is not a journal entry,
+        // and the reverse.
+        let item = seal_item(&vault_key(5), &ACCOUNT, &ITEM, 3, b"secret", &mut rng()).unwrap();
+        assert_eq!(
+            open_journal_entry(&item, &journal_key(5), &ACCOUNT, &JOURNAL, 3).unwrap_err(),
+            SealError::Rejected
+        );
+        let entry = seal_journal_entry(
+            &journal_key(5),
+            &ACCOUNT,
+            &JOURNAL,
+            3,
+            b"secret",
+            &mut rng(),
+        )
+        .unwrap();
+        assert_eq!(
+            open_item(&entry, &vault_key(5), &ACCOUNT, &ITEM, 3).unwrap_err(),
+            SealError::Rejected
+        );
+        assert_eq!(
+            &open_journal_entry(&sealed, &key, &ACCOUNT, &JOURNAL, 3).unwrap()[..],
+            b"secret"
+        );
+    }
+
     const ITEM_REFERENCE: &str = "01242424242424242424242424242424242424242424242424cd2bb9110b567e26a22f3f3a0e880dca32f18eba7c1f749d2161e64d6b10dbcd149188d8349b5b9c7cb5b1bbf9dd288c574d2ffe274881dc123a89d3911fb4f8ee9432240631db00cc966d3e35245afabe9b70c0a6386ea403bf33f097187924d56b377c62d1a6055294105aacce651bb564a2c42ff7499438dc9febe1f0315cba2a75624e6ea1be97dd042eb3ec28086dc7e95c41425e220ba1bf3c5abdcc8a295dd67dcd55084001333b3e5ac085a5bfdb2bf2ad8cd2355749f0c217a628235ee4249c9b9135b7c79700af17bfb2bbc6dca65fb1df3c5a3ef2630602dfc5fce598147556e52b73bfdd79a54e8ebbdc7614d2612de10e3be021ad627e2920e877fda2d89c67dd847c7e474c56525472";
     const VAULT_KEY_REFERENCE: &str = "01313131313131313131313131313131313131313131313131759ea6c1905e877884a77dece62d14bec5f0a22bf5471ed86f542ba3ea563700e1c0b7def0a6483fec8a4ae401c2c0b5";
+    const JOURNAL_KEY_REFERENCE: &str = "015151515151515151515151515151515151515151515151516384bb1f2e1026e571c41eae3f8cf817a16178dac53a10eb964a2563f4900edcbfc915b18110d6a0a3acc10a81b39119";
+    const JOURNAL_ENTRY_REFERENCE: &str = "015252525252525252525252525252525252525252525252525f32d17e98bcb74a2b54ccdbe6ad969c0b3b31e592a1b6e5ddaf69e1ce9d4382ed09609aedb1a8da15f204d3aa424f3ee9ddebb232b812f44328f534a83efc62a5b468c99925d0f7e1b21e47aad4bcfdb85de7bc30c3cdbb6434cabe260fb267a332206f0007b3e688ddaa67db3a3fdbbafb2411b5e0ef7ae402b94889013760d9d29ca5a78da213022f1e4cda2897410bf2a3ff69ada51c93545eb5ff41c00a365f9cd5b8bbba7dbdcc87925face140ee07352e41b576eaf011b87853ab425f3cbffce1019d41b3645db1d51559c24667229afc30d97db2b62d989dd349bdadf78f7a90dfb0130d755580da59efb41457c0a356f2a35299a1977a2d62b65c26617cf9147e1bf6665355e6596dbde394";
 }
