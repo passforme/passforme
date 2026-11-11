@@ -24,7 +24,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::item::Item;
 use crate::kdf::{self, AccountId, AuthKey, KdfError, KdfParams, Salt, SecretKey};
-use crate::seal::{self, ItemId, SealError, Sealed, VaultKey};
+use crate::seal::{self, ItemId, JournalId, JournalKey, SealError, Sealed, VaultKey};
 
 pub const FILE_FORMAT: u32 = 1;
 
@@ -376,6 +376,31 @@ impl UnlockedVault {
 
     pub fn auth_key(&self) -> &AuthKey {
         &self.auth_key
+    }
+
+    /// Wraps the key of a new agent journal under the vault key.
+    pub fn wrap_journal_key<R: CryptoRng + ?Sized>(
+        &self,
+        journal_key: &JournalKey,
+        journal_id: &JournalId,
+        rng: &mut R,
+    ) -> Sealed {
+        seal::wrap_journal_key(
+            journal_key,
+            &self.vault_key,
+            &self.file.account_id,
+            journal_id,
+            rng,
+        )
+    }
+
+    /// The key of an agent journal written for this vault.
+    pub fn unwrap_journal_key(
+        &self,
+        sealed: &Sealed,
+        journal_id: &JournalId,
+    ) -> Result<JournalKey, SealError> {
+        seal::unwrap_journal_key(sealed, &self.vault_key, &self.file.account_id, journal_id)
     }
 
     /// The stored revision of an item, if it exists.

@@ -106,3 +106,52 @@ as a `CryptoRng` argument and never opens it itself.
    the hash only keeps a leaked server copy from being replayed as a login.
    A PAKE (OPAQUE) would hide even `auth_key` from the server; not worth its
    complexity while `auth_key` opens nothing.
+
+7. **Agent journal** (`crates/core/src/journal.rs`, `seal.rs`; added
+   2026-11-11; the design is in `design.md`, Agent space). No new
+   primitive: the two constructions of 4 and 5 under two new domain
+   labels.
+
+   - `unlock --writable` draws a random 16-byte `journal_id` and a random
+     32-byte `journal_key`. The key is wrapped like the vault key:
+     XChaCha20-Poly1305 under `vault_key`, random 24-byte nonce, AAD =
+     `"strongbox v1 journal-key" ‖ account_id ‖ journal_id`. The wrapped
+     key and the id are the first line of `agent-journal`; the bare key
+     goes to the unlock agent on stdin and lives only in its memory.
+   - Each entry is `{ "id": item_id, "item": … }` as JSON, padded like an
+     item, sealed with XChaCha20-Poly1305 under `journal_key`, fresh
+     random nonce, AAD =
+     `"strongbox v1 journal-entry" ‖ account_id ‖ journal_id ‖ sequence (u64 BE)`,
+     the sequence counting from 0 in the order written. Same wire format
+     as 5, one entry per line in base64.
+   - The import unwraps the key with the vault key and opens the lines
+     in order, each at the sequence after the last one that opened; a
+     line that does not open is passed over and reported.
+
+   Verified: both formats byte for byte against
+   `tools/seal_reference.py` (libsodium through PyNaCl); the wrapped key
+   and an entry rejected under every wrong context (key, account,
+   journal, sequence before and after), and each rejected as the other
+   and as an item under the same key bytes.
+
+   Decisions and why:
+
+   - **A key of its own, not one derived from `vault_key`:** the agent
+     must hold it, and nothing the agent holds may say anything about the
+     vault key. A random key wrapped under the vault key gives that
+     without relying on a KDF's one-wayness.
+   - **One key per journal**, dropped with it at import: whoever reads
+     the agent's memory learns a key that opens only entries for items
+     the agent holds anyway.
+   - **`journal_id` and the sequence in the AAD:** an entry opens only at
+     its place in its journal, so entries cannot be reordered, repeated,
+     or carried over from an earlier journal. Dropping entries from the
+     end is not detected (dropping one from the middle takes the later
+     ones along); an entry count kept elsewhere would have to be written
+     by the same agent to the same directory, and would protect nothing.
+   - **The labels continue the `strongbox v1` family** rather than start
+     a `passforme` one: a label is a domain separator, not a name, and
+     one family keeps the list in `seal.rs` uniform.
+   - Authenticity of an entry proves it came from the agent process, not
+     that it is allowed: the import still checks each one against the
+     rules in `design.md`.

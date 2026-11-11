@@ -44,9 +44,27 @@ pub struct Item {
     /// master password (API keys and the like); everything else never is.
     #[serde(default, skip_serializing_if = "is_false")]
     pub agent: bool,
+    /// Who created it. Absent (the owner) in every item typed at a
+    /// terminal; `agent` in one a program created through a writable
+    /// unlock agent, the only items such a program may change.
+    #[serde(default, skip_serializing_if = "is_owner")]
+    #[zeroize(skip)]
+    pub origin: Origin,
     /// Unix seconds.
     pub created: u64,
     pub modified: u64,
+}
+
+/// Who created an item. An origin from a newer version reads as `Other`,
+/// which gives no right to change the item through the agent.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Origin {
+    #[default]
+    Owner,
+    Agent,
+    #[serde(other)]
+    Other,
 }
 
 /// A free-form extra field; `concealed` ones are masked like the password.
@@ -118,6 +136,11 @@ fn is_false(value: &bool) -> bool {
 }
 
 #[allow(clippy::trivially_copy_pass_by_ref)] // serde's signature
+fn is_owner(origin: &Origin) -> bool {
+    *origin == Origin::Owner
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref)] // serde's signature
 fn is_login(kind: &Kind) -> bool {
     *kind == Kind::Login
 }
@@ -168,9 +191,27 @@ mod tests {
                 data: "aGVsbG8=".into(),
             }],
             agent: true,
+            origin: Origin::Agent,
             created: 1,
             modified: 2,
         }
+    }
+
+    #[test]
+    fn origin_is_absent_for_the_owner_and_unknown_ones_read_as_other() {
+        let mut item = Item::default();
+        item.title = "t".into();
+        item.origin = Origin::Agent;
+        assert_eq!(
+            &item.to_plaintext()[..],
+            br#"{"title":"t","origin":"agent","created":0,"modified":0}"#
+        );
+        let old = Item::from_plaintext(br#"{"title":"t","created":0,"modified":0}"#).unwrap();
+        assert_eq!(old.origin, Origin::Owner);
+        let newer =
+            Item::from_plaintext(br#"{"title":"t","origin":"robot","created":0,"modified":0}"#)
+                .unwrap();
+        assert_eq!(newer.origin, Origin::Other);
     }
 
     #[test]
