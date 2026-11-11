@@ -94,7 +94,10 @@ is written into `docs/design.md`, dated, with what it replaced.
   `## [X.Y.Z] - date`, bumps `version` in `Cargo.toml`, commits
   `chore(release): vX.Y.Z` and pushes the tag `vX.Y.Z`; `release.yml`
   builds x86_64 and aarch64 Linux tarballs with checksums and uses that
-  section as the release notes. Then `cargo publish --workspace` puts
+  section as the release notes. **The number follows SemVer as it is
+  read below 1.0:** only fixes under `[Unreleased]` make a patch
+  (`0.1.1`); a new command, option or behaviour, or anything
+  incompatible, makes a minor (`0.2.0`). Then `cargo publish --workspace` puts
   the three crates on crates.io, in dependency order, with the token
   the owner keeps in passforme (`crates.io passforme`), never in a file. Linux only: the client needs `prctl`,
   `/proc` and `wl-copy`.
