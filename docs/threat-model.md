@@ -17,6 +17,13 @@ Not protected against (accepted):
 
 - **Malware on the laptop while the vault is unlocked.** A client with the
   keys in memory can be read by anything running as the same user.
+- **Programs of the same user while the unlock agent runs.** They can
+  read the items marked for it, and nothing else. While it runs
+  *writable* (`unlock --writable`) they can also create items and
+  overwrite the ones programs created, within fixed limits; they cannot
+  change an item the owner created, nor make one of the owner's queries
+  resolve to something else. What a program stores may come from a
+  hostile source and is to be read as such.
 - **A malicious server withholding data:** it can refuse to serve, or serve an
   older copy of the whole vault (rollback). Mitigation: the client
   remembers the highest vault revision it has seen and refuses to go back.

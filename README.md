@@ -128,6 +128,16 @@ pfm unlock --for 8h                      # master password once
 pfm get openrouter --stdout              # the value alone, for a script or a key_command
 ```
 
+A program can also keep what it creates, such as the test accounts an AI
+agent makes while testing an application for you, when you unlock with
+`--writable`. It can change only the items it added, never yours:
+
+```sh
+pfm unlock --for 8h --writable                              # you, once
+pfm add "acme test user" --agent-space --generate           # the program
+pfm get "acme test user" --stdout
+```
+
 Sync is optional: `pfm register URL` puts the vault on your own
 `passforme-server`, and `pfm login URL` sets up another device from it.
 Every change made at the terminal is uploaded at once; conflicts keep

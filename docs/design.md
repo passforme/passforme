@@ -78,7 +78,7 @@ passforme generate [--length 32] [--symbols] [--avoid-ambiguous] [--words 6 [--l
 passforme add TITLE [--username USER] [--url URL]... [--generate [generator options]]
 passforme add TITLE --kind KIND [--file PATH]   # card, pin, crypto-seed…: asks for each field
 passforme kinds                     # the kinds and what each holds
-passforme codes QUERY [--list]      # copy the next unused recovery code, mark it used
+passforme codes QUERY [--list | --stdout]  # copy (or print) the next unused recovery code, mark it used
 passforme add-many                  # label + secret, repeated; vault opened once, saved per item
 passforme list                      # table: user, URL, AGENT, what else it holds (no secrets)
 passforme show QUERY [--reveal]     # secrets masked unless --reveal
@@ -92,8 +92,10 @@ passforme edit QUERY [--title T] [--username USER] [--url URL] [--rm-url URL]
                      [--codes] [--kind KIND] [--attach PATH] [--rm-attachment NAME]
 passforme totp QUERY                # current code; `get --field totp` copies it
 passforme passwd                    # new master password, vault key rotated
-passforme unlock [--for 8h|forever] [ITEM…]  # marked items (all, or the ones named) to the agent
+passforme unlock [--for 8h|forever] [--writable] [ITEM…]  # marked items (all, or the ones named) to the agent
 passforme get QUERY --stdout        # value alone on stdout, for programs
+passforme add TITLE --agent-space … # for programs, through a writable agent: also
+                                    # `edit QUERY --agent-space …`, `list --agent-space`
 passforme lock                      # close the session and empty the agent now
 passforme status                    # session, agent (locked / time left / no limit), sync link
 passforme completions bash          # Tab completion script (sourced from ~/.bashrc)
@@ -251,7 +253,8 @@ Decisions and why:
 **Files** (`crates/cli/src/store.rs`): `$PASSFORME_DIR`, or
 `$XDG_DATA_HOME/passforme`, or `~/.local/share/passforme`, mode 0700, with
 `vault.json` (0600, ciphertext only; the previous version kept as
-`vault.json.bak`) and `secret-key` (0600, the Secret Key in Emergency Kit
+`vault.json.bak`), `agent-journal` while a writable unlock agent runs
+(Agent space, below) and `secret-key` (0600, the Secret Key in Emergency Kit
 text, refused if group or others can read it, as ssh does). The vault is
 replaced atomically: temporary file, `fsync`, copy to `.bak`, `rename`,
 `fsync` of the directory.
@@ -349,7 +352,9 @@ passforme lock                       # or wait for the time to run out
   had left: in "every marked item" mode a newly marked item joins; with a
   selection it stays out; an emptied selection locks the agent. The agent
   itself accepts no new values from anyone — only a command that has just
-  opened the vault with the master password starts a new one. An agent
+  opened the vault with the master password starts a new one. (Since
+  2026-11-11 a *writable* agent does take items from programs, into a
+  class of their own: Agent space, below.) An agent
   whose status carries no selection is treated as "every marked item";
   tested.
 - `unlock` syncs first when linked. `status` lists what the agent holds and
@@ -364,6 +369,154 @@ refused while unlocked; socket 0600 in a 0700 directory; agent's
 remove it; a startup failure reaches `unlock` with its reason. **Not tested:**
 a connection from another uid (needs a second account); the 0600 socket in a
 0700 directory already stops it before `SO_PEERCRED`.
+
+## Agent space (programs that keep what they create)
+
+Added 2026-11-11. Until then the agent "accept[ed] no new values from
+anyone"; that still holds unless the owner opts in with `--writable`.
+
+Exists so that an AI agent working for the owner (testing an application
+the owner is authorized to test, for one) can keep the accounts it
+creates there: password, TOTP secret, recovery codes, notes. Before, it
+could only read what the owner had typed in. It runs without a terminal
+and must never hold the master password.
+
+```
+passforme unlock --for 8h --writable             # owner, at a terminal: opt in
+
+# a program, without a terminal; each prompt reads one line of stdin
+passforme add "acme staging admin" --agent-space --username a@acme.test \
+              --url https://staging.acme.test --generate
+passforme add "acme staging user" --agent-space      # the secret on stdin, once
+passforme edit "acme staging admin" --agent-space --totp     # secret on stdin
+passforme edit "acme staging admin" --agent-space --codes    # one per line, to an empty line or EOF
+passforme get "acme staging admin" --stdout                  # as before
+passforme get "acme staging admin" --field totp --stdout     # current code, as before
+passforme codes "acme staging admin" --stdout                # next unused code, marked used
+passforme list --agent-space                                 # what the agent holds, no secrets
+```
+
+- **The problem:** writing to the vault takes the vault key (to seal the
+  item) and the auth key (to sync), and the unlock agent has neither, on
+  purpose. Handing it the vault key would turn "any process of this user
+  can read the marked items" into "can read the whole vault".
+- **A journal, not a key to the vault.** `unlock --writable` creates a
+  random *journal key*, writes it wrapped under the vault key as the
+  first line of `agent-journal` (beside `vault.json`, 0600), and hands
+  the bare key to the unlock agent with the items. Each write through
+  the socket appends the whole new item, sealed under the journal key,
+  to the journal, and only then changes the item in the agent's memory:
+  a write that is acknowledged is on disk. The agent can therefore write
+  only things that it could already read. Cryptography in
+  `cryptography.md`, 7; code in `crates/core/src/journal.rs` and
+  `crates/cli/src/agent.rs`.
+- **Imported by the next command that opens the vault**, any of them,
+  reading ones included (`settle_agent` in `main.rs`, called from
+  `Session::open` and `Session::commit`): it unwraps the journal key,
+  applies the entries in order as ordinary items sealed under the vault
+  key, saves, syncs like `add` does, and restarts the agent with a fresh
+  journal. Until then the items exist only on this device; they survive
+  a reboot in the journal, but are readable again only after the next
+  `unlock`. Reading commands import too, rather than only the writing
+  ones, so that what a program stored reaches the server and the other
+  devices at the owner's first use of the vault, whatever it is.
+- **Nothing falls between the journal and the import.** The command
+  locks the journal (`flock`), reads it, saves the vault, and only then
+  removes the journal or renames a new one over it, still locked. The
+  agent locks the journal for each append and checks, once it has the
+  lock, that the file at that path is still the one it was started with;
+  if not, it refuses with "try again", and the client retries for two
+  seconds while the new agent starts. Tested with twelve programs
+  writing while two commands imported: all twelve items arrived.
+- **Agent-made items are a class of their own.** An item created through
+  the socket carries `"origin": "agent"` (an optional JSON member, like
+  `kind`: no format bump, older clients ignore it) and is always marked
+  `agent`. The socket, and again the import (`journal::apply`), allow a
+  write only when it creates such an item or changes one: an item the
+  owner created, marked `--agent` or not, cannot be changed through the
+  socket. The import re-checks every entry and reports and skips what
+  breaks a rule, rather than trusting the agent process. `list` shows
+  them as `agent-made` in the AGENT column, `show` says so too.
+- **No shadowing** (`pick_tiered`). A `QUERY` is resolved among the
+  owner's items first, with the usual rule, and among agent-made items
+  only when none of the owner's matches. An agent-made item titled
+  `router` can therefore neither take over `get router` from the owner's
+  "OpenRouter" nor make it ambiguous (tested both). This matters because
+  whatever an AI agent stores may come from the application it is
+  testing, which may be hostile to it.
+- **The item is built by the client** (`add --agent-space` runs the same
+  code as `add`, with the same checks and the same generator) and handed
+  whole to the agent, which forces its origin, mark and dates, checks it
+  and keeps it. `edit --agent-space` fetches the item, changes it as
+  `edit` does, and hands it back. A typed secret is asked once, not
+  twice: a program does not mistype. A generated password is not copied
+  to the clipboard; the program reads it back with `get --stdout`.
+- **`codes --stdout`** prints the next unused code alone and marks it
+  used: through the agent for agent-made items (the mark is a write, so
+  not for the owner's), with the master password at a terminal for any.
+- **No `rm` through the socket**, and no attachments. Removing is the
+  owner's, at a terminal (`passforme rm`). Edits overwrite; the server's
+  history (30 versions) is the way back.
+- **Bounded:** at most 200 agent-made items, 64 KiB each, and a journal
+  of at most 4 MiB, after which writes fail until an import. The whole
+  vault is uploaded on every change, so a runaway program must not be
+  able to grow it without limit.
+- **Opt-in per unlock.** Without `--writable` the agent is exactly what
+  it was: read-only, no journal. `status` says which, and how many
+  writes wait in the journal. `--writable` combines with `--for forever`
+  and with a selection (`unlock --writable ITEM…`), and may start empty;
+  a writable agent always holds every agent-made item, whatever the
+  selection, since those are what programs come back for.
+- **`passwd`** imports the journal and removes it before the vault key
+  changes (the journal key is wrapped under it), then restarts the agent
+  with a journal under the new key. Writes in between are refused.
+- **A damaged journal never blocks the vault.** A line that does not
+  open as the next entry (half a line after a crash, something another
+  process appended) is passed over and the entries after it still open;
+  a journal for another vault, or whose key does not unwrap, is not
+  imported at all. Either way the file is kept as
+  `agent-journal.rejected`, the owner is told, and the command goes on.
+- **No vault format bump:** `vault.json` and the server are untouched.
+  The journal is a local file with its own `format` number.
+
+What it adds to the threat model: while a writable agent runs, any
+process of this user can create and overwrite agent-made items, up to
+the limits (wrong test credentials, recovery codes marked used). It
+still cannot read or change anything else, and cannot make a query of
+the owner's resolve to something else. Someone able to write the journal
+file can remove entries (the ones after a removed entry no longer open)
+but cannot forge, change or reorder them.
+
+Tested with throwaway directories, programs run as a `key_command` is
+(`setsid -w … </dev/null` or a pipe): writes refused while locked and
+while read-only; add (generated and typed), TOTP, codes used one by one;
+the owner's items refused for `edit --agent-space` and `codes --stdout`;
+import by a reading command, with the agent restarted; import after the
+agent was emptied (as after a reboot), without one; garbage appended to
+the journal passed over and the write after it imported; twelve
+concurrent writes against two imports; the owner editing an agent-made
+item; `passwd` with writes before and after; two devices and a local
+server, the item reaching the second one; no title or secret in clear in
+the journal, the vaults or the server's directory.
+
+Rejected:
+
+- **The vault key in the agent**, or the master password on the AI
+  agent's stdin: both give a process that reads hostile content the
+  whole vault.
+- **A second vault** (`PASSFORME_DIR`) whose master password is an
+  `--agent` item of the first. Works with no code, but each command pays
+  Argon2, the password travels through pipes, and one server holds one
+  vault, so it does not sync.
+- **A public key anyone can seal to** (an inbox). Durable without any
+  running agent, but a new primitive (X25519 sealed boxes) for a case
+  the agent, which must be running to read anyway, already covers.
+- **A separate key for agent-made items inside `vault.json`.** The agent
+  could then persist without a journal, but it still could not sync, and
+  it costs a format bump and a second key to rotate in `passwd`.
+- **Importing only in the commands that write.** Fewer saves and syncs
+  from reading commands, but an item a program stored could then sit on
+  one device for days.
 
 ## Sync server (`passforme-server`) and sync
 

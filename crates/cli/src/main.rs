@@ -5,7 +5,8 @@ use base64ct::{Base64, Encoding};
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use getrandom::SysRng;
 use passforme_core::generator::{self, Generated, Language, PassphraseSpec, PasswordSpec};
-use passforme_core::item::{Attachment, Field, Item};
+use passforme_core::item::{Attachment, Field, Item, Origin};
+use passforme_core::journal;
 use passforme_core::kdf::{KdfParams, SecretKey};
 use passforme_core::kind::{Kind, Slot};
 use passforme_core::seal::ItemId;
@@ -80,6 +81,11 @@ enum Command {
         /// Make it readable by programs through the unlock agent.
         #[arg(long)]
         agent: bool,
+        /// For programs: add it through a writable unlock agent, without
+        /// the master password (`unlock --writable`). Prompts read one
+        /// line each from stdin.
+        #[arg(long, conflicts_with = "agent")]
+        agent_space: bool,
     },
     /// Add several items in a row, a label and a secret each, unlocking the
     /// vault once; an empty label finishes.
@@ -99,9 +105,19 @@ enum Command {
         /// Show every code and which are used, instead.
         #[arg(long)]
         list: bool,
+        /// Print the code alone (no newline) instead of copying it: for
+        /// programs. Through a writable unlock agent it needs no master
+        /// password, for the items programs made.
+        #[arg(long, conflicts_with = "list")]
+        stdout: bool,
     },
     /// List the items.
-    List,
+    List {
+        /// What the unlock agent holds instead, without the master
+        /// password: for programs.
+        #[arg(long)]
+        agent_space: bool,
+    },
     /// Show an item; secrets are masked unless --reveal.
     Show {
         /// Title, or part of it.
@@ -143,6 +159,10 @@ enum Command {
         /// `forever` to keep them until `passforme lock` (or the session ends).
         #[arg(long = "for", value_name = "DURATION", default_value = "8h")]
         duration: String,
+        /// Also let programs add items (`add --agent-space`) and change
+        /// the ones they added; never the ones you created.
+        #[arg(long)]
+        writable: bool,
     },
     /// Lock now: close the session and empty the unlock agent.
     Lock,
@@ -205,6 +225,11 @@ enum Command {
         /// Change what the item is (`passforme kinds`); its fields stay.
         #[arg(long, value_parser = kind_names())]
         kind: Option<String>,
+        /// For programs: change an item they added, through a writable
+        /// unlock agent, without the master password. Prompts read one
+        /// line each from stdin.
+        #[arg(long, conflicts_with_all = ["agent", "no_agent", "attach", "rm_attachment"])]
+        agent_space: bool,
     },
     /// Print the current TOTP code of an item.
     Totp {
@@ -463,19 +488,21 @@ fn run(command: Command) -> Result<()> {
             generate,
             spec,
             agent,
+            agent_space,
         } => {
             spec.only_with_generate(generate)?;
-            add(
-                title,
-                kinds::parse(&kind)?,
-                kinds::Given {
-                    username,
-                    urls: url,
-                    generate: generate.then_some(&spec),
-                    file: file.as_deref(),
-                },
-                agent,
-            )
+            let kind = kinds::parse(&kind)?;
+            let given = kinds::Given {
+                username,
+                urls: url,
+                generate: generate.then_some(&spec),
+                file: file.as_deref(),
+            };
+            if agent_space {
+                add_through_agent(title, kind, given)
+            } else {
+                add(title, kind, given, agent)
+            }
         }
         Command::AddMany => add_many(),
         Command::Kinds => {
@@ -486,8 +513,19 @@ fn run(command: Command) -> Result<()> {
             completions(shell);
             Ok(())
         }
-        Command::Codes { query, list } => codes(&query, list),
-        Command::List => list(),
+        Command::Codes {
+            query,
+            list,
+            stdout,
+        } => {
+            if stdout {
+                codes_stdout(&query)
+            } else {
+                codes(&query, list, false)
+            }
+        }
+        Command::List { agent_space: true } => list_through_agent(),
+        Command::List { agent_space: false } => list(),
         Command::Show { query, reveal } => show(&query, reveal),
         Command::Get {
             query,
@@ -504,7 +542,11 @@ fn run(command: Command) -> Result<()> {
                 get(&query, field.as_deref())
             }
         }
-        Command::Unlock { duration, items } => unlock_agent(&duration, &items),
+        Command::Unlock {
+            duration,
+            items,
+            writable,
+        } => unlock_agent(&duration, &items, writable),
         Command::Lock => lock(),
         Command::Status => status(),
         Command::Agent { secs } => agent::serve(secs),
@@ -529,8 +571,14 @@ fn run(command: Command) -> Result<()> {
             attach,
             rm_attachment,
             kind,
+            agent_space,
         } => {
             spec.only_with_generate(generate)?;
+            let edit = if agent_space {
+                edit_through_agent
+            } else {
+                edit
+            };
             edit(
                 &query,
                 &Edit {
@@ -621,7 +669,18 @@ fn status() -> Result<()> {
             } else {
                 "every marked item"
             };
+            let scope = if response.writable {
+                format!(
+                    "writable ({} change(s) waiting for the vault), {scope}",
+                    response.pending.unwrap_or(0)
+                )
+            } else {
+                scope.to_owned()
+            };
             match response.titles {
+                Some(titles) if titles.is_empty() => {
+                    println!("Agent:  unlocked, {time}, {scope}: no item yet");
+                }
                 Some(titles) => {
                     println!("Agent:  unlocked, {time}, {scope}: {}", titles.join(", "));
                 }
@@ -724,7 +783,7 @@ fn add(title: String, kind: Kind, given: kinds::Given<'_>, agent: bool) -> Resul
     item.title = title;
     item.kind = kind;
     let generated = if kind == Kind::Login && given.file.is_none() {
-        fill_login(&mut item, given)?
+        fill_login(&mut item, given, true)?
     } else {
         kinds::fill(&mut item, given)?
     };
@@ -745,16 +804,17 @@ fn add(title: String, kind: Kind, given: kinds::Given<'_>, agent: bool) -> Resul
     Ok(())
 }
 
-/// A login as it always was: the secret asked twice (it is typed), the
-/// username and URLs only from the command line.
-fn fill_login(item: &mut Item, given: kinds::Given<'_>) -> Result<Option<Generated>> {
+/// A login as it always was: the secret asked twice when it is typed
+/// (`repeat`; a program sends it once), the username and URLs only from
+/// the command line.
+fn fill_login(item: &mut Item, given: kinds::Given<'_>, repeat: bool) -> Result<Option<Generated>> {
     let generated = given.generate.map(GenArgs::generate).transpose()?;
     let password = if let Some(g) = &generated {
         g.secret.clone()
     } else {
         let first =
             prompt::secret("Secret for the item (password, API key, token; empty for none): ")?;
-        if !first.expose_secret().is_empty() {
+        if repeat && !first.expose_secret().is_empty() {
             let again = prompt::secret("Repeat the secret: ")?;
             if again.expose_secret() != first.expose_secret() {
                 return Err("the passwords do not match".into());
@@ -822,60 +882,11 @@ fn list() -> Result<()> {
         eprintln!("The vault is empty; add an item with `passforme add`.");
         return Ok(());
     }
-    let rows: Vec<[String; 6]> = items
+    let rows: Vec<Vec<String>> = items
         .iter()
-        .map(|(_, item)| {
-            let mut also = Vec::new();
-            if item.password.is_empty() && item.kind.password_label().is_some() {
-                also.push("no secret".to_owned());
-            }
-            if item.urls.len() > 1 {
-                also.push(format!("+{} URL", item.urls.len() - 1));
-            }
-            if !item.totp.is_empty() {
-                also.push("TOTP".to_owned());
-            }
-            if !item.notes.is_empty() {
-                also.push("notes".to_owned());
-            }
-            if !item.fields.is_empty() {
-                also.push(format!("{} field(s)", item.fields.len()));
-            }
-            if !item.codes.is_empty() {
-                let left = item.codes.iter().filter(|c| !c.used).count();
-                also.push(format!("{left}/{} codes", item.codes.len()));
-            }
-            if !item.attachments.is_empty() {
-                also.push(format!("{} file(s)", item.attachments.len()));
-            }
-            [
-                item.title.clone(),
-                item.kind.name().to_owned(),
-                item.username.clone(),
-                item.urls.first().cloned().unwrap_or_default(),
-                if item.agent { "yes" } else { "" }.to_owned(),
-                also.join(", "),
-            ]
-        })
+        .map(|(_, item)| list_row(item).to_vec())
         .collect();
-    let header = ["TITLE", "KIND", "USERNAME", "URL", "AGENT", "ALSO"].map(str::to_owned);
-    let widths: Vec<usize> = (0..6)
-        .map(|c| {
-            std::iter::once(&header)
-                .chain(&rows)
-                .map(|r| r[c].chars().count())
-                .max()
-                .unwrap_or(0)
-        })
-        .collect();
-    for row in std::iter::once(&header).chain(&rows) {
-        let line: Vec<String> = row
-            .iter()
-            .zip(&widths)
-            .map(|(cell, &w)| format!("{cell:w$}"))
-            .collect();
-        println!("{}", line.join("  ").trim_end());
-    }
+    print_table(&rows);
     let marked = items.iter().filter(|(_, i)| i.agent).count();
     eprintln!(
         "{} item(s); {marked} marked for the agent (`passforme unlock`).",
@@ -884,31 +895,145 @@ fn list() -> Result<()> {
     Ok(())
 }
 
-/// Which of `titles` `query` means: an exact (case-insensitive) title wins,
-/// otherwise the only title containing it. Shared with the agent, so both
-/// resolve a query the same way.
-fn pick_index(titles: &[&str], query: &str) -> Result<usize> {
+/// One row of `list` for an item: what it holds, never the secrets. Shared
+/// with the agent (`list --agent-space`).
+fn list_row(item: &Item) -> [String; 6] {
+    let mut also = Vec::new();
+    if item.password.is_empty() && item.kind.password_label().is_some() {
+        also.push("no secret".to_owned());
+    }
+    if item.urls.len() > 1 {
+        also.push(format!("+{} URL", item.urls.len() - 1));
+    }
+    if !item.totp.is_empty() {
+        also.push("TOTP".to_owned());
+    }
+    if !item.notes.is_empty() {
+        also.push("notes".to_owned());
+    }
+    if !item.fields.is_empty() {
+        also.push(format!("{} field(s)", item.fields.len()));
+    }
+    if !item.codes.is_empty() {
+        let left = item.codes.iter().filter(|c| !c.used).count();
+        also.push(format!("{left}/{} codes", item.codes.len()));
+    }
+    if !item.attachments.is_empty() {
+        also.push(format!("{} file(s)", item.attachments.len()));
+    }
+    let agent = match (item.origin, item.agent) {
+        (Origin::Agent, true) => "agent-made",
+        (Origin::Agent, false) => "agent-made, unmarked",
+        (_, true) => "yes",
+        (_, false) => "",
+    };
+    [
+        item.title.clone(),
+        item.kind.name().to_owned(),
+        item.username.clone(),
+        item.urls.first().cloned().unwrap_or_default(),
+        agent.to_owned(),
+        also.join(", "),
+    ]
+}
+
+/// The rows of `list_row` under their header, columns padded.
+fn print_table(rows: &[Vec<String>]) {
+    let header: Vec<String> = ["TITLE", "KIND", "USERNAME", "URL", "AGENT", "ALSO"]
+        .map(str::to_owned)
+        .to_vec();
+    let widths: Vec<usize> = (0..header.len())
+        .map(|c| {
+            std::iter::once(&header)
+                .chain(rows)
+                .filter_map(|r| r.get(c))
+                .map(|cell| cell.chars().count())
+                .max()
+                .unwrap_or(0)
+        })
+        .collect();
+    for row in std::iter::once(&header).chain(rows) {
+        let line: Vec<String> = row
+            .iter()
+            .zip(&widths)
+            .map(|(cell, &w)| format!("{cell:w$}"))
+            .collect();
+        println!("{}", line.join("  ").trim_end());
+    }
+}
+
+/// `list --agent-space`: what the unlock agent holds, asked of the agent.
+fn list_through_agent() -> Result<()> {
+    let response = ask_agent(&agent::Request::List)?;
+    let rows = response.rows.unwrap_or_default();
+    if rows.is_empty() {
+        eprintln!("The agent holds no item.");
+    } else {
+        print_table(&rows);
+    }
+    Ok(())
+}
+
+/// What `query` means among `titles`, when it means anything.
+enum Picked {
+    One(usize),
+    None,
+    Several(Vec<usize>),
+}
+
+/// An exact (case-insensitive) title wins, otherwise the only title
+/// containing the query.
+fn pick_among(titles: &[&str], query: &str) -> Picked {
     let needle = query.to_lowercase();
     if let Some(index) = titles.iter().position(|t| t.to_lowercase() == needle) {
-        return Ok(index);
+        return Picked::One(index);
     }
     let matches: Vec<usize> = (0..titles.len())
         .filter(|&i| titles[i].to_lowercase().contains(&needle))
         .collect();
     match matches[..] {
-        [] => Err(format!("no item matches '{query}'").into()),
-        [index] => Ok(index),
-        _ => {
-            let names: Vec<&str> = matches.iter().map(|&i| titles[i]).collect();
-            Err(format!("'{query}' matches several items: {}", names.join(", ")).into())
+        [] => Picked::None,
+        [index] => Picked::One(index),
+        _ => Picked::Several(matches),
+    }
+}
+
+/// Which of `titles` `query` means. The owner's items are searched first,
+/// and the agent-made ones (`made`) only when none of the owner's matches:
+/// an item a program stored can neither take a query over from one of the
+/// owner's nor make it ambiguous. Shared with the agent, so both resolve a
+/// query the same way.
+fn pick_tiered(titles: &[&str], made: &[bool], query: &str) -> Result<usize> {
+    for tier in [false, true] {
+        let indices: Vec<usize> = (0..titles.len()).filter(|&i| made[i] == tier).collect();
+        let tier_titles: Vec<&str> = indices.iter().map(|&i| titles[i]).collect();
+        match pick_among(&tier_titles, query) {
+            Picked::One(index) => return Ok(indices[index]),
+            Picked::None => {}
+            Picked::Several(matches) => {
+                let names: Vec<&str> = matches.iter().map(|&i| tier_titles[i]).collect();
+                return Err(
+                    format!("'{query}' matches several items: {}", names.join(", ")).into(),
+                );
+            }
         }
     }
+    Err(format!("no item matches '{query}'").into())
+}
+
+/// `pick_tiered` over items with their ids.
+fn pick_item(items: &[(ItemId, Item)], query: &str) -> Result<usize> {
+    let titles: Vec<&str> = items.iter().map(|(_, i)| i.title.as_str()).collect();
+    let made: Vec<bool> = items
+        .iter()
+        .map(|(_, i)| i.origin == Origin::Agent)
+        .collect();
+    pick_tiered(&titles, &made, query)
 }
 
 fn find(vault: &UnlockedVault, query: &str) -> Result<(ItemId, Item)> {
     let mut items = vault.items()?;
-    let titles: Vec<&str> = items.iter().map(|(_, i)| i.title.as_str()).collect();
-    let index = pick_index(&titles, query)?;
+    let index = pick_item(&items, query)?;
     Ok(items.swap_remove(index))
 }
 
@@ -1002,17 +1127,27 @@ fn show(query: &str, reveal: bool) -> Result<()> {
             ),
         ));
     }
-    if item.agent {
-        rows.push((
-            "Agent".into(),
-            "readable by programs while `passforme unlock` is active".into(),
-        ));
+    if let Some(note) = agent_note(&item) {
+        rows.push(("Agent".into(), note.into()));
     }
     print_rows(&rows);
     if !item.notes.is_empty() {
         println!("Notes:\n{}", item.notes);
     }
     Ok(())
+}
+
+/// What `show` says about an item and the unlock agent, if anything.
+fn agent_note(item: &Item) -> Option<&'static str> {
+    match (item.origin, item.agent) {
+        (Origin::Agent, true) => Some(
+            "made by a program (`--agent-space`); readable and changeable by programs \
+             while `passforme unlock --writable` is active",
+        ),
+        (Origin::Agent, false) => Some("made by a program (`--agent-space`); unmarked since"),
+        (_, true) => Some("readable by programs while `passforme unlock` is active"),
+        (_, false) => None,
+    }
 }
 
 /// Labels padded to a common width; a multi-line value (a private key)
@@ -1034,8 +1169,45 @@ fn print_rows(rows: &[(String, String)]) {
     }
 }
 
-/// Copies the next unused recovery code and marks it used, or lists them.
-fn codes(query: &str, list: bool) -> Result<()> {
+/// `codes --stdout`: through the agent for the items programs made;
+/// otherwise the master password on a terminal, and an immediate failure
+/// anywhere else, as with `get --stdout`.
+fn codes_stdout(query: &str) -> Result<()> {
+    use std::io::{IsTerminal, Write};
+    let request = agent::Request::Code {
+        query: query.to_owned(),
+    };
+    let at_terminal = std::io::stdin().is_terminal();
+    match try_agent(&request)? {
+        Some(agent::Response {
+            ok: true,
+            value: Some(value),
+            left,
+            ..
+        }) => {
+            let value = zeroize::Zeroizing::new(value);
+            let mut out = std::io::stdout().lock();
+            out.write_all(value.as_bytes())?;
+            out.flush()?;
+            if let Some(left) = left {
+                eprintln!("Marked used; {left} left.");
+            }
+            Ok(())
+        }
+        Some(response) if !at_terminal => Err(response
+            .error
+            .unwrap_or_else(|| "the agent refused".into())
+            .into()),
+        None if !at_terminal => {
+            Err("the vault is locked: run `passforme unlock --writable` in a terminal".into())
+        }
+        _ => codes(query, false, true),
+    }
+}
+
+/// Copies the next unused recovery code (or prints it alone, `to_stdout`)
+/// and marks it used, or lists them.
+fn codes(query: &str, list: bool, to_stdout: bool) -> Result<()> {
     let mut session = Session::open()?;
     let (id, mut item) = find(&session.vault, query)?;
     if item.codes.is_empty() {
@@ -1061,18 +1233,33 @@ fn codes(query: &str, list: bool) -> Result<()> {
         )
         .into());
     };
-    // Copied before saving: if the clipboard fails, the code stays unused.
-    clipboard::copy_and_clear_later(item.codes[n].code.as_bytes())?;
+    // Handed over before saving: if that fails, the code stays unused.
+    if to_stdout {
+        use std::io::Write;
+        let mut out = std::io::stdout().lock();
+        out.write_all(item.codes[n].code.as_bytes())?;
+        out.flush()?;
+    } else {
+        clipboard::copy_and_clear_later(item.codes[n].code.as_bytes())?;
+    }
     item.codes[n].used = true;
     item.modified = now();
     session.vault.update(&id, &item, &mut UnwrapErr(SysRng))?;
     let left = item.codes.iter().filter(|c| !c.used).count();
-    eprintln!(
-        "Copied code {} of {total} from '{}', now marked used; {left} left. Cleared in {} s.",
-        n + 1,
-        item.title,
-        clipboard::CLEAR_AFTER_SECS
-    );
+    if to_stdout {
+        eprintln!(
+            "Code {} of {total} from '{}', now marked used; {left} left.",
+            n + 1,
+            item.title
+        );
+    } else {
+        eprintln!(
+            "Copied code {} of {total} from '{}', now marked used; {left} left. Cleared in {} s.",
+            n + 1,
+            item.title,
+            clipboard::CLEAR_AFTER_SECS
+        );
+    }
     match left {
         0 => eprintln!("That was the last one: make new codes on the site."),
         1 | 2 => eprintln!("Few codes left: make new ones on the site soon."),
@@ -1178,7 +1365,7 @@ fn parse_duration(text: &str) -> Result<Option<u64>> {
     Ok(Some(secs))
 }
 
-fn unlock_agent(duration: &str, names: &[String]) -> Result<()> {
+fn unlock_agent(duration: &str, names: &[String], writable: bool) -> Result<()> {
     let secs = parse_duration(duration)?;
     let mut session = Session::open()?;
     if session.store.sync_state()?.is_some() {
@@ -1191,10 +1378,9 @@ fn unlock_agent(duration: &str, names: &[String]) -> Result<()> {
         None
     } else {
         let all = session.vault.items()?;
-        let titles: Vec<&str> = all.iter().map(|(_, i)| i.title.as_str()).collect();
         let mut ids = Vec::new();
         for name in names {
-            let (id, item) = &all[pick_index(&titles, name)?];
+            let (id, item) = &all[pick_item(&all, name)?];
             if !item.agent {
                 return Err(format!(
                     "'{}' is not marked for the agent; mark it first with \
@@ -1210,73 +1396,350 @@ fn unlock_agent(duration: &str, names: &[String]) -> Result<()> {
         }
         Some(ids)
     };
-    let items = agent_items(&session.vault, selection.as_deref())?;
-    if items.is_empty() {
-        return Err(
-            "no item is marked for the agent; mark one with `passforme edit ITEM --agent`".into(),
-        );
+    let plan = AgentPlan {
+        secs,
+        selection,
+        writable,
+    };
+    let settled = settle_agent(&mut session, Restart::Start(plan))?;
+    if settled.imported {
+        session.sync_or_warn();
     }
-    let titles: Vec<String> = items.iter().map(|i| i.title.clone()).collect();
-    agent::start(&agent::Load { selection, items }, secs)?;
     let how_long = if secs.is_some() {
         format!("for {duration}")
     } else {
         "with no time limit (until a reboot or logout)".to_owned()
     };
-    eprintln!(
-        "The agent holds {} item(s) {how_long}: {}. `passforme lock` empties it.",
-        titles.len(),
-        titles.join(", ")
-    );
+    if settled.held.is_empty() {
+        eprintln!("The agent holds no item yet, {how_long}. `passforme lock` empties it.");
+    } else {
+        eprintln!(
+            "The agent holds {} item(s) {how_long}: {}. `passforme lock` empties it.",
+            settled.held.len(),
+            settled.held.join(", ")
+        );
+    }
+    if writable {
+        eprintln!(
+            "Writable: programs can add items with `passforme add TITLE --agent-space` and \
+             change the ones they added, never yours."
+        );
+    }
     Ok(())
 }
 
-/// The marked items, limited to `selection` (base64 ids) when given.
-fn agent_items(vault: &UnlockedVault, selection: Option<&[String]>) -> Result<Vec<Item>> {
+/// The marked items, limited to `selection` (base64 ids) when given. A
+/// writable agent holds every agent-made item whatever the selection: they
+/// are what programs come back for.
+fn agent_items(
+    vault: &UnlockedVault,
+    selection: Option<&[String]>,
+    writable: bool,
+) -> Result<Vec<agent::Held>> {
     Ok(vault
         .items()?
         .into_iter()
+        .map(|(id, item)| (Base64::encode_string(id.as_bytes()), item))
         .filter(|(id, item)| {
             item.agent
-                && selection.is_none_or(|ids| ids.contains(&Base64::encode_string(id.as_bytes())))
+                && (selection.is_none_or(|ids| ids.contains(id))
+                    || (writable && item.origin == Origin::Agent))
         })
         // Programs read values, not files: attachments stay out of the agent.
-        .map(|(_, mut item)| {
+        .map(|(id, mut item)| {
             item.attachments.clear();
-            item
+            agent::Held { id, item }
         })
         .collect())
 }
 
-/// After a change, rebuilds a running agent from the vault with the same
-/// selection and the time it had left. Only a command that has just opened
-/// the vault with the master password does this; the agent itself takes no
-/// new values from anyone. Returns what to tell the user.
-fn refresh_agent(vault: &UnlockedVault) -> Result<Option<String>> {
-    let Some(status) = agent::request(&agent::Request::Status)? else {
-        return Ok(None);
+/// How an unlock agent is to run.
+struct AgentPlan {
+    secs: Option<u64>,
+    selection: Option<Vec<String>>,
+    writable: bool,
+}
+
+/// When `settle_agent` (re)starts the agent.
+enum Restart {
+    /// `unlock`: start one like this.
+    Start(AgentPlan),
+    /// After a change to the vault: rebuild a running agent as it was.
+    Refresh,
+    /// Before a command: only when the journal holds something.
+    IfWaiting,
+    /// Before the vault key changes: bring the journal in and remove it,
+    /// so that a writable agent refuses writes until the `Refresh` after.
+    Pause,
+}
+
+#[derive(Default)]
+struct Settled {
+    /// Whether the journal changed the vault (saved already).
+    imported: bool,
+    /// Titles the (re)started agent holds.
+    held: Vec<String>,
+}
+
+/// Brings the agent journal into the vault and, as `restart` says,
+/// (re)starts the agent from the vault with a fresh journal. The one place
+/// where the two meet: the journal stays locked from the moment it is read
+/// until it is removed or replaced, so no write of the agent's falls in
+/// between, and only a command that has just opened the vault with the
+/// master password ever gets here.
+fn settle_agent(session: &mut Session, restart: Restart) -> Result<Settled> {
+    // Asked before the journal is locked: an agent in the middle of an
+    // append waits for that lock and answers nobody meanwhile.
+    let running = match restart {
+        Restart::Start(_) | Restart::Pause => None,
+        Restart::Refresh | Restart::IfWaiting => agent::request(&agent::Request::Status)?,
     };
-    let secs = match status.expires {
-        Some(at) if at <= now() => return Ok(None),
-        Some(at) => Some(at - now()),
-        None => None,
+    let mut settled = Settled::default();
+    let journal = session.store.lock_journal()?;
+    let waiting = match &journal {
+        Some((_, text)) => {
+            let (waiting, imported) = import_journal(session, text)?;
+            settled.imported = imported;
+            waiting
+        }
+        None => false,
     };
-    let items = agent_items(vault, status.selection.as_deref())?;
-    if items.is_empty() {
+    let starting = matches!(restart, Restart::Start(_));
+    let plan = match restart {
+        Restart::IfWaiting if !waiting => return Ok(settled),
+        Restart::Start(plan) => Some(plan),
+        Restart::Pause => None,
+        Restart::Refresh | Restart::IfWaiting => running.and_then(|status| {
+            let secs = match status.expires {
+                Some(at) if at <= now() => return None,
+                Some(at) => Some(at - now()),
+                None => None,
+            };
+            Some(AgentPlan {
+                secs,
+                selection: status.selection,
+                writable: status.writable,
+            })
+        }),
+    };
+    let Some(plan) = plan else {
+        // No agent to carry on with it.
+        if journal.is_some() {
+            session.store.remove_journal()?;
+        }
+        return Ok(settled);
+    };
+
+    let items = agent_items(&session.vault, plan.selection.as_deref(), plan.writable)?;
+    if items.is_empty() && !plan.writable {
+        if journal.is_some() {
+            session.store.remove_journal()?;
+        }
+        drop(journal);
+        if starting {
+            return Err(
+                "no item is marked for the agent; mark one with `passforme edit ITEM --agent`"
+                    .into(),
+            );
+        }
         agent::request(&agent::Request::Lock)?;
-        return Ok(Some(
-            "The agent had no marked item left and was emptied.".into(),
-        ));
+        eprintln!("The agent had no marked item left and was emptied.");
+        return Ok(settled);
     }
-    let titles: Vec<String> = items.iter().map(|i| i.title.clone()).collect();
+    let journal_load = if plan.writable {
+        let (head, key) = journal::Head::create(&session.vault, &mut UnwrapErr(SysRng));
+        session.store.start_journal(&head.to_line())?;
+        let path = session.store.journal_path();
+        Some(agent::JournalLoad {
+            path: std::fs::canonicalize(&path).unwrap_or(path),
+            account_id: Base64::encode_string(head.account_id.as_bytes()),
+            journal_id: Base64::encode_string(head.journal_id.as_bytes()),
+            key: Base64::encode_string(key.as_bytes()),
+        })
+    } else {
+        if journal.is_some() {
+            session.store.remove_journal()?;
+        }
+        None
+    };
+    // Unlocked only now that the old journal is gone from its path: an
+    // agent that was waiting to append finds that out and refuses.
+    drop(journal);
+    settled.held = items.iter().map(|h| h.item.title.clone()).collect();
     agent::start(
         &agent::Load {
-            selection: status.selection,
+            selection: plan.selection,
             items,
+            journal: journal_load,
         },
-        secs,
+        plan.secs,
     )?;
-    Ok(Some(format!("Agent refreshed: {}.", titles.join(", "))))
+    if !starting {
+        // Titles while they fit on a line; a count beyond that.
+        if settled.held.len() <= 8 {
+            eprintln!("Agent refreshed: {}.", settled.held.join(", "));
+        } else {
+            eprintln!("Agent refreshed: {} items.", settled.held.len());
+        }
+    }
+    Ok(settled)
+}
+
+/// Applies the entries of a journal to the vault and saves it. Returns
+/// whether the journal held any entry, and whether the vault changed.
+fn import_journal(session: &mut Session, text: &str) -> Result<(bool, bool)> {
+    let mut lines = text.lines();
+    let head_line = lines.next().unwrap_or_default();
+    let entry_lines: Vec<&str> = lines.filter(|l| !l.trim().is_empty()).collect();
+    if entry_lines.is_empty() {
+        return Ok((false, false));
+    }
+    let opened = journal::Head::from_line(head_line)
+        .and_then(|head| head.unwrap_key(&session.vault).map(|key| (head, key)));
+    let (head, key) = match opened {
+        Ok(opened) => opened,
+        Err(e) => {
+            let kept = session.store.keep_rejected_journal()?;
+            eprintln!(
+                "What programs wrote through the agent was not imported: {e}. \
+                 Kept as {}.",
+                kept.display()
+            );
+            return Ok((true, false));
+        }
+    };
+    // A line that does not open as the next entry is passed over (half a
+    // line after a crash, something another process appended): the entries
+    // after it still open at their places. A removed entry cannot be
+    // passed over, and takes the ones after it along.
+    let mut entries = Vec::with_capacity(entry_lines.len());
+    for line in &entry_lines {
+        let sequence = entries.len() as u64;
+        if let Some(entry) =
+            journal::open_entry(line, &key, &head.account_id, &head.journal_id, sequence)
+        {
+            entries.push(entry);
+        }
+    }
+    if entries.len() < entry_lines.len() {
+        let kept = session.store.keep_rejected_journal()?;
+        eprintln!(
+            "{} of the {} lines of the agent journal are damaged and were not imported. \
+             Kept as {}.",
+            entry_lines.len() - entries.len(),
+            entry_lines.len(),
+            kept.display()
+        );
+    }
+    let applied = journal::apply(&mut session.vault, entries, &mut UnwrapErr(SysRng))?;
+    for skipped in &applied.skipped {
+        eprintln!("From the agent: {skipped}.");
+    }
+    if applied.changed.is_empty() {
+        return Ok((true, false));
+    }
+    session.store.save_vault(session.vault.file())?;
+    eprintln!(
+        "Imported what programs wrote through the agent: {}.",
+        applied.changed.join(", ")
+    );
+    Ok((true, true))
+}
+
+/// One request to the unlock agent, tried again for a moment while the
+/// agent is being restarted. `None` when no agent is running.
+fn try_agent(request: &agent::Request) -> Result<Option<agent::Response>> {
+    let mut tries = 0;
+    loop {
+        match agent::request(request)? {
+            Some(response) if response.retry && tries < 8 => {
+                tries += 1;
+                std::thread::sleep(std::time::Duration::from_millis(250));
+            }
+            other => return Ok(other),
+        }
+    }
+}
+
+/// A request that must succeed: for the commands of `--agent-space`.
+fn ask_agent(request: &agent::Request) -> Result<agent::Response> {
+    match try_agent(request)? {
+        Some(response) if response.ok => Ok(response),
+        Some(response) => Err(response
+            .error
+            .unwrap_or_else(|| "the agent refused".into())
+            .into()),
+        None => Err(
+            "the vault is locked: the owner runs `passforme unlock --writable` \
+                     in a terminal"
+                .into(),
+        ),
+    }
+}
+
+/// Refuses early, before anything is read from stdin, when no writable
+/// agent runs.
+fn need_writable_agent() -> Result<()> {
+    if ask_agent(&agent::Request::Status)?.writable {
+        Ok(())
+    } else {
+        Err("the agent is read-only; the owner makes it writable with \
+             `passforme unlock --writable`"
+            .into())
+    }
+}
+
+/// `add --agent-space`: the item is built here as `add` builds it, each
+/// prompt reading a line of stdin, and handed to the agent, which keeps it
+/// and writes it to its journal.
+fn add_through_agent(title: String, kind: Kind, given: kinds::Given<'_>) -> Result<()> {
+    kinds::check_given(kind, &given)?;
+    need_writable_agent()?;
+    let mut item = Item::default();
+    item.title = title;
+    item.kind = kind;
+    let generated = if kind == Kind::Login && given.file.is_none() {
+        fill_login(&mut item, given, false)?
+    } else {
+        kinds::fill(&mut item, given)?
+    };
+    let title = item.title.clone();
+    ask_agent(&agent::Request::Create { item })?;
+    eprintln!("Added '{title}' to the agent space.");
+    if let Some(g) = generated {
+        eprintln!(
+            "Generated password ({:.0} bits) stored; read it with \
+             `passforme get '{title}' --stdout`.",
+            g.entropy_bits
+        );
+    }
+    Ok(())
+}
+
+/// `edit --agent-space`: fetches an agent-made item from the agent, changes
+/// it as `edit` does, and hands it back.
+fn edit_through_agent(query: &str, change: &Edit) -> Result<()> {
+    if change.is_empty() {
+        return Err("nothing to change; see `passforme edit --help`".into());
+    }
+    need_writable_agent()?;
+    let fetched = ask_agent(&agent::Request::Fetch {
+        query: query.to_owned(),
+    })?;
+    let (Some(id), Some(mut item)) = (fetched.id, fetched.item) else {
+        return Err("unexpected answer from the agent".into());
+    };
+    let generated = apply_edit(&mut item, change, false)?;
+    let title = item.title.clone();
+    ask_agent(&agent::Request::Replace { id, item })?;
+    eprintln!("Updated '{title}' in the agent space.");
+    if let Some(g) = generated {
+        eprintln!(
+            "New password ({:.0} bits) stored; read it with `passforme get '{title}' --stdout`.",
+            g.entropy_bits
+        );
+    }
+    Ok(())
 }
 
 fn remove(query: &str) -> Result<()> {
@@ -1356,6 +1819,28 @@ fn edit(query: &str, change: &Edit) -> Result<()> {
         if taken {
             return Err(format!("an item called '{title}' already exists").into());
         }
+    }
+    let generated = apply_edit(&mut item, change, true)?;
+    item.modified = now();
+    vault.update(&id, &item, &mut UnwrapErr(SysRng))?;
+    eprintln!("Updated '{}'.", item.title);
+    session.commit()?;
+    if let Some(g) = generated {
+        clipboard::copy_and_clear_later(g.secret.expose_secret().as_bytes())?;
+        eprintln!(
+            "New password ({:.0} bits) copied; cleared in {} s.",
+            g.entropy_bits,
+            clipboard::CLEAR_AFTER_SECS
+        );
+    }
+    Ok(())
+}
+
+/// Changes `item` as `change` says, asking for what it needs. A typed
+/// secret is asked twice (`repeat`), except from a program. Returns the
+/// generated password, if one was asked for.
+fn apply_edit(item: &mut Item, change: &Edit, repeat: bool) -> Result<Option<Generated>> {
+    if let Some(title) = &change.title {
         item.title.clone_from(title);
     }
     if let Some(username) = &change.username {
@@ -1378,9 +1863,11 @@ fn edit(query: &str, change: &Edit) -> Result<()> {
         NewPassword::Keep => {}
         NewPassword::Prompt => {
             let password = prompt::secret("New secret for the item (password, API key, token): ")?;
-            let again = prompt::secret("Repeat the secret: ")?;
-            if again.expose_secret() != password.expose_secret() {
-                return Err("the passwords do not match".into());
+            if repeat {
+                let again = prompt::secret("Repeat the secret: ")?;
+                if again.expose_secret() != password.expose_secret() {
+                    return Err("the passwords do not match".into());
+                }
             }
             password.expose_secret().clone_into(&mut item.password);
         }
@@ -1404,8 +1891,8 @@ fn edit(query: &str, change: &Edit) -> Result<()> {
         }
         text.expose_secret().trim().clone_into(&mut item.totp);
     }
-    apply_fields(&mut item, change)?;
-    apply_attachments(&mut item, change)?;
+    apply_fields(item, change)?;
+    apply_attachments(item, change)?;
     if let Some(agent) = change.agent {
         item.agent = agent;
     }
@@ -1421,20 +1908,7 @@ fn edit(query: &str, change: &Edit) -> Result<()> {
             .trim_end()
             .clone_into(&mut item.notes);
     }
-
-    item.modified = now();
-    vault.update(&id, &item, &mut UnwrapErr(SysRng))?;
-    eprintln!("Updated '{}'.", item.title);
-    session.commit()?;
-    if let Some(g) = generated {
-        clipboard::copy_and_clear_later(g.secret.expose_secret().as_bytes())?;
-        eprintln!(
-            "New password ({:.0} bits) copied; cleared in {} s.",
-            g.entropy_bits,
-            clipboard::CLEAR_AFTER_SECS
-        );
-    }
-    Ok(())
+    Ok(generated)
 }
 
 /// Removes, then sets the extra fields named in `change`.
@@ -1634,6 +2108,8 @@ fn totp(query: &str) -> Result<()> {
 fn passwd() -> Result<()> {
     let mut session = Session::open()?;
     let password = new_master_password()?;
+    // The journal's key is wrapped under the vault key about to be replaced.
+    settle_agent(&mut session, Restart::Pause)?;
     if session.store.sync_state()?.is_some() {
         sync::change_password(&mut session, &password, &KdfParams::DEFAULT)?;
     } else {
@@ -1650,6 +2126,9 @@ fn passwd() -> Result<()> {
     session.store.remove_backup()?;
     // So would the open session.
     keeper::lock()?;
+    if let Err(e) = settle_agent(&mut session, Restart::Refresh) {
+        eprintln!("Could not refresh the agent ({e}); run `passforme unlock`.");
+    }
     eprintln!(
         "Master password changed. The Secret Key is unchanged. Older copies of the vault\n\
          file (backups) still open with the old password, but only as they were then."
@@ -1671,6 +2150,26 @@ mod tests {
             };
             assert_eq!(attachment_len(&attachment), len);
         }
+    }
+
+    #[test]
+    fn the_owners_items_are_picked_before_agent_made_ones() {
+        let titles = ["OpenRouter", "router", "Bank", "acme admin", "acme user"];
+        let made = [false, true, false, true, true];
+        let pick = |query| pick_tiered(&titles, &made, query).map_err(|e| e.to_string());
+        // An agent-made exact title does not take over a query of the owner's.
+        assert_eq!(pick("router"), Ok(0));
+        assert_eq!(pick("ROUTER"), Ok(0));
+        assert_eq!(pick("bank"), Ok(2));
+        // Agent-made items answer only what no item of the owner's matches.
+        assert_eq!(pick("acme admin"), Ok(3));
+        assert_eq!(pick("admin"), Ok(3));
+        assert!(pick("acme").unwrap_err().contains("several"));
+        assert!(pick("nothing").unwrap_err().contains("no item matches"));
+        // Nor can one make a query of the owner's ambiguous.
+        let titles = ["OpenRouter", "OpenRouter test"];
+        assert_eq!(pick_tiered(&titles, &[false, true], "open").unwrap(), 0);
+        assert!(pick_tiered(&titles, &[false, false], "open").is_err());
     }
 
     #[test]

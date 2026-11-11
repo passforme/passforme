@@ -21,6 +21,13 @@
 //!
 //! Same-user malware can still ask it for the marked items while it runs;
 //! the point of the scope is that this is all it can get.
+//!
+//! **Writable** (`unlock --writable`): programs may also create items and
+//! change the ones they created (an AI agent keeping the test accounts it
+//! makes). The agent still has no vault key. It holds the key of a
+//! *journal* (`passforme_core::journal`), appends every such item to it,
+//! sealed, and the next command that opens the vault brings the journal
+//! in. Items the owner created are never changed through the socket.
 
 use std::fs::{self, DirBuilder};
 use std::io::{self, BufRead, BufReader, Read, Write};
@@ -32,25 +39,53 @@ use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use passforme_core::item::Item;
+use base64ct::{Base64, Encoding};
+use getrandom::SysRng;
+use passforme_core::item::{Item, Origin};
+use passforme_core::journal;
+use passforme_core::kdf::AccountId;
+use passforme_core::seal::{ItemId, JournalId, JournalKey};
+use rand_core::UnwrapErr;
 use serde::{Deserialize, Serialize};
-use zeroize::Zeroizing;
+use zeroize::{Zeroize, Zeroizing};
 
 use crate::error::Result;
 
 /// How often the agent checks that its socket still exists.
 const WATCH_SECS: u64 = 30;
-/// Longest a request line may be.
-const REQUEST_LIMIT: u64 = 4096;
+/// Longest a request line may be: room for the largest agent-made item.
+const REQUEST_LIMIT: u64 = 2 * journal::MAX_AGENT_ITEM_LEN as u64;
 /// Longest timed `unlock --for` accepts; `forever` has no limit.
 pub const MAX_SECS: u64 = 7 * 24 * 3600;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "op", rename_all = "lowercase", deny_unknown_fields)]
 pub enum Request {
-    Get { query: String, field: String },
+    Get {
+        query: String,
+        field: String,
+    },
     Status,
     Lock,
+    /// What the agent holds, as the rows of `list`.
+    List,
+    /// A new agent-made item.
+    Create {
+        item: Item,
+    },
+    /// An agent-made item, whole, for a client about to change it.
+    Fetch {
+        query: String,
+    },
+    /// The agent-made item `id` as the client changed it.
+    Replace {
+        id: String,
+        item: Item,
+    },
+    /// The next unused recovery code of an agent-made item, marked used.
+    Code {
+        query: String,
+    },
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -73,6 +108,26 @@ pub struct Response {
     /// marked item, so that a newly marked one joins on refresh.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub selection: Option<Vec<String>>,
+    /// Whether programs may create items and change the ones they made.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub writable: bool,
+    /// Writes waiting in the journal for a command that opens the vault.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pending: Option<u64>,
+    /// The agent is being restarted; the same request works in a moment.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub retry: bool,
+    /// `Fetch`: the item and its id.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub item: Option<Item>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    /// `List`: one row per item, as `list` prints them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rows: Option<Vec<Vec<String>>>,
+    /// `Code`: unused codes left.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub left: Option<usize>,
 }
 
 /// What `unlock` hands the agent.
@@ -80,7 +135,34 @@ pub struct Response {
 #[serde(deny_unknown_fields)]
 pub struct Load {
     pub selection: Option<Vec<String>>,
-    pub items: Vec<Item>,
+    pub items: Vec<Held>,
+    /// Present for a writable agent.
+    pub journal: Option<JournalLoad>,
+}
+
+/// An item and its id (base64) in the vault.
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Held {
+    pub id: String,
+    pub item: Item,
+}
+
+/// The journal a writable agent appends to, and its bare key.
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct JournalLoad {
+    pub path: PathBuf,
+    pub account_id: String,
+    pub journal_id: String,
+    /// Base64; wiped on drop.
+    pub key: String,
+}
+
+impl Drop for JournalLoad {
+    fn drop(&mut self) {
+        self.key.zeroize();
+    }
 }
 
 impl Response {
@@ -127,7 +209,7 @@ pub(crate) fn call<Q: Serialize, A: serde::de::DeserializeOwned>(
         Err(e) => return Err(crate::error::Error::Io(path.to_owned(), e)),
     };
     stream.set_read_timeout(Some(Duration::from_secs(5)))?;
-    let mut line = serde_json::to_vec(request).expect("requests serialize");
+    let mut line = Zeroizing::new(serde_json::to_vec(request).expect("requests serialize"));
     line.push(b'\n');
     stream.write_all(&line)?;
     let mut answer = Zeroizing::new(String::new());
@@ -163,7 +245,126 @@ pub fn start(load: &Load, secs: Option<u64>) -> Result<()> {
     }
 }
 
-type Held = Arc<Mutex<Option<Vec<Item>>>>;
+/// What the agent holds; `None` once emptied.
+struct State {
+    items: Vec<Held>,
+    journal: Option<Journal>,
+}
+
+type Shared = Arc<Mutex<Option<State>>>;
+
+/// The journal of a writable agent.
+struct Journal {
+    path: PathBuf,
+    account_id: AccountId,
+    id: JournalId,
+    key: JournalKey,
+    /// Place of the next entry.
+    next: u64,
+    /// A write failed halfway: the file may end in half a line, so nothing
+    /// more is appended to it.
+    broken: bool,
+}
+
+/// Why a write was refused: a sentence, and whether trying again helps.
+struct Refused {
+    why: String,
+    retry: bool,
+}
+
+impl From<&str> for Refused {
+    fn from(why: &str) -> Self {
+        Self {
+            why: why.to_owned(),
+            retry: false,
+        }
+    }
+}
+
+impl From<String> for Refused {
+    fn from(why: String) -> Self {
+        Self { why, retry: false }
+    }
+}
+
+impl Journal {
+    fn open(load: &JournalLoad) -> Result<Self> {
+        let fixed = |text: &str| {
+            Base64::decode_vec(text)
+                .ok()
+                .and_then(|v| <[u8; 16]>::try_from(v).ok())
+                .ok_or("bad journal")
+        };
+        let key = Zeroizing::new(Base64::decode_vec(&load.key).map_err(|_| "bad journal")?);
+        Ok(Self {
+            path: load.path.clone(),
+            account_id: AccountId::from_bytes(fixed(&load.account_id)?),
+            id: JournalId::from_bytes(fixed(&load.journal_id)?),
+            key: JournalKey::from_bytes(&key).ok_or("bad journal")?,
+            next: 0,
+            broken: false,
+        })
+    }
+
+    /// Appends `item` under `id`, durably, or changes nothing. The file is
+    /// locked for the append, and must still be the one this agent was
+    /// started with: a command that imported it has removed or replaced it,
+    /// and is about to restart the agent.
+    fn append(&mut self, id: &ItemId, item: &Item) -> std::result::Result<(), Refused> {
+        use std::os::unix::fs::MetadataExt;
+        let stale = || Refused {
+            why: "the agent is being refreshed; try again".to_owned(),
+            retry: true,
+        };
+        if self.broken {
+            return Err(
+                "the agent journal is damaged; run any passforme command in a terminal \
+                        to import it"
+                    .into(),
+            );
+        }
+        let line = journal::seal_entry(
+            &self.key,
+            &self.account_id,
+            &self.id,
+            self.next,
+            id,
+            item,
+            &mut UnwrapErr(SysRng),
+        )
+        .map_err(|e| e.to_string())?;
+        let mut file = fs::OpenOptions::new()
+            .append(true)
+            .open(&self.path)
+            .map_err(|_| stale())?;
+        rustix::fs::flock(&file, rustix::fs::FlockOperation::LockExclusive)
+            .map_err(|e| format!("cannot lock the agent journal: {e}"))?;
+        let ours = file.metadata().map_err(|_| stale())?;
+        if fs::metadata(&self.path).map_or(true, |m| m.ino() != ours.ino()) {
+            return Err(stale());
+        }
+        if ours.len() + line.len() as u64 + 1 > journal::MAX_JOURNAL_LEN {
+            return Err(
+                "the agent journal is full; run any passforme command in a terminal to import it"
+                    .into(),
+            );
+        }
+        if let Err(e) = file
+            .write_all(format!("{line}\n").as_bytes())
+            .and_then(|()| file.sync_data())
+        {
+            self.broken = true;
+            return Err(format!("cannot write the agent journal: {e}").into());
+        }
+        self.next += 1;
+        Ok(())
+    }
+}
+
+/// A copy of an item, which is deliberately not `Clone`.
+fn copy(item: &Item) -> Item {
+    Item::from_plaintext(&item.to_plaintext()).expect("an item's own JSON parses")
+}
 
 /// Body of `__agent`: runs detached until its time is up or `lock`. Its
 /// stderr goes nowhere, so a startup failure is reported on the line where
@@ -196,7 +397,7 @@ pub fn serve(secs: u64) -> Result<()> {
 }
 
 /// Ends the agent when its time is up or its socket is gone or replaced.
-fn watch(held: &Held, path: &PathBuf, inode: u64, expires: Option<u64>) -> ! {
+fn watch(held: &Shared, path: &PathBuf, inode: u64, expires: Option<u64>) -> ! {
     loop {
         let now = crate::now();
         if expires.is_some_and(|at| now >= at)
@@ -212,14 +413,19 @@ fn watch(held: &Held, path: &PathBuf, inode: u64, expires: Option<u64>) -> ! {
 type Selection = Option<Vec<String>>;
 
 /// Reads the items from stdin and binds the private socket.
-fn listen() -> Result<(UnixListener, PathBuf, Held, Selection)> {
+fn listen() -> Result<(UnixListener, PathBuf, Shared, Selection)> {
     let mut payload = Zeroizing::new(Vec::new());
     io::stdin().read_to_end(&mut payload)?;
-    let Load { selection, items } =
-        serde_json::from_slice(&payload).map_err(|e| format!("bad items: {e}"))?;
+    let Load {
+        selection,
+        items,
+        journal,
+    } = serde_json::from_slice(&payload).map_err(|e| format!("bad items: {e}"))?;
     drop(payload);
+    let journal = journal.as_ref().map(Journal::open).transpose()?;
     let (listener, path) = bind_private("agent.sock")?;
-    Ok((listener, path, Arc::new(Mutex::new(Some(items))), selection))
+    let state = State { items, journal };
+    Ok((listener, path, Arc::new(Mutex::new(Some(state))), selection))
 }
 
 /// Binds `name` in the private runtime directory (0700, this user's),
@@ -246,7 +452,7 @@ pub(crate) fn same_user(stream: &UnixStream) -> bool {
 }
 
 /// Wipes the items (they zeroize on drop), removes the socket, exits.
-fn shutdown(held: &Held, path: &PathBuf) -> ! {
+fn shutdown(held: &Shared, path: &PathBuf) -> ! {
     let mut guard = held
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -258,7 +464,7 @@ fn shutdown(held: &Held, path: &PathBuf) -> ! {
 /// Answers one connection; true when it asked the agent to lock.
 fn handle(
     stream: &UnixStream,
-    held: &Held,
+    held: &Shared,
     expires: Option<u64>,
     selection: Option<&Vec<String>>,
 ) -> bool {
@@ -271,35 +477,23 @@ fn handle(
     if reader.read_line(&mut line).is_err() {
         return false;
     }
-    let (response, lock) = match serde_json::from_str::<Request>(&line) {
-        Ok(Request::Lock) => (
-            Response {
-                ok: true,
-                ..Response::default()
-            },
-            true,
-        ),
-        Ok(Request::Status) => {
-            let titles: Vec<String> = held
+    let request = serde_json::from_str::<Request>(&line);
+    let lock = matches!(request, Ok(Request::Lock));
+    let response = match request {
+        Ok(Request::Lock) => Response {
+            ok: true,
+            ..Response::default()
+        },
+        Ok(request) => {
+            let mut guard = held
                 .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .as_ref()
-                .map(|items| items.iter().map(|i| i.title.clone()).collect())
-                .unwrap_or_default();
-            (
-                Response {
-                    ok: true,
-                    items: Some(titles.len()),
-                    expires,
-                    titles: Some(titles),
-                    selection: selection.cloned(),
-                    ..Response::default()
-                },
-                false,
-            )
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            match guard.as_mut() {
+                Some(state) => answer(state, request, expires, selection),
+                None => Response::error("the agent is locked"),
+            }
         }
-        Ok(Request::Get { query, field }) => (answer_get(held, &query, &field), false),
-        Err(e) => (Response::error(format!("bad request: {e}")), false),
+        Err(e) => Response::error(format!("bad request: {e}")),
     };
     let mut out = Zeroizing::new(serde_json::to_vec(&response).expect("responses serialize"));
     out.push(b'\n');
@@ -310,29 +504,222 @@ fn handle(
     lock
 }
 
-fn answer_get(held: &Held, query: &str, field: &str) -> Response {
-    let guard = held
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
-    let Some(items) = guard.as_ref() else {
-        return Response::error("the agent is locked");
+fn answer(
+    state: &mut State,
+    request: Request,
+    expires: Option<u64>,
+    selection: Option<&Vec<String>>,
+) -> Response {
+    let ok = || Response {
+        ok: true,
+        ..Response::default()
     };
-    let titles: Vec<&str> = items.iter().map(|i| i.title.as_str()).collect();
-    let item = match crate::pick_index(&titles, query) {
-        Ok(index) => &items[index],
-        Err(_) => {
-            return Response::error(format!(
+    let result = match request {
+        Request::Lock => Ok(ok()),
+        Request::Status => {
+            let titles: Vec<String> = state.items.iter().map(|h| h.item.title.clone()).collect();
+            Ok(Response {
+                items: Some(titles.len()),
+                expires,
+                titles: Some(titles),
+                selection: selection.cloned(),
+                writable: state.journal.is_some(),
+                pending: state.journal.as_ref().map(|j| j.next),
+                ..ok()
+            })
+        }
+        Request::List => Ok(Response {
+            rows: Some(
+                state
+                    .items
+                    .iter()
+                    .map(|h| crate::list_row(&h.item).to_vec())
+                    .collect(),
+            ),
+            ..ok()
+        }),
+        Request::Get { query, field } => get(state, &query, &field),
+        Request::Create { item } => create(state, item).map(|()| ok()),
+        Request::Fetch { query } => fetch(state, &query),
+        Request::Replace { id, item } => replace(state, &id, item).map(|()| ok()),
+        Request::Code { query } => code(state, &query),
+    };
+    result.unwrap_or_else(|refused| Response {
+        retry: refused.retry,
+        ..Response::error(refused.why)
+    })
+}
+
+type Answer<T> = std::result::Result<T, Refused>;
+
+/// Which held item `query` means: the owner's first, as everywhere.
+fn pick(state: &State, query: &str) -> Answer<usize> {
+    let titles: Vec<&str> = state.items.iter().map(|h| h.item.title.as_str()).collect();
+    let made: Vec<bool> = state
+        .items
+        .iter()
+        .map(|h| h.item.origin == Origin::Agent)
+        .collect();
+    crate::pick_tiered(&titles, &made, query).map_err(|e| {
+        if e.to_string().starts_with("no item matches") {
+            format!(
                 "no item matching '{query}' is available to the agent \
                  (mark it with `passforme edit ITEM --agent`, then `passforme unlock`)"
-            ));
+            )
+            .into()
+        } else {
+            e.to_string().into()
+        }
+    })
+}
+
+fn get(state: &State, query: &str, field: &str) -> Answer<Response> {
+    let item = &state.items[pick(state, query)?].item;
+    let (_, value) = crate::field_value(item, Some(field)).map_err(|e| e.to_string())?;
+    Ok(Response {
+        ok: true,
+        value: Some(value.to_string()),
+        ..Response::default()
+    })
+}
+
+/// The journal, or why nothing can be written.
+fn writable(state: &mut State) -> Answer<&mut Journal> {
+    state.journal.as_mut().ok_or_else(|| {
+        "the agent is read-only; the owner makes it writable with \
+         `passforme unlock --writable`"
+            .into()
+    })
+}
+
+/// An agent-made item by query, or why it cannot be changed.
+fn pick_made(state: &State, query: &str) -> Answer<usize> {
+    let index = pick(state, query)?;
+    let item = &state.items[index].item;
+    if item.origin == Origin::Agent {
+        Ok(index)
+    } else {
+        Err(format!(
+            "'{}' is the owner's: a program can only change the items it made",
+            item.title
+        )
+        .into())
+    }
+}
+
+fn title_taken(state: &State, title: &str, except: Option<usize>) -> bool {
+    state
+        .items
+        .iter()
+        .enumerate()
+        .any(|(n, h)| Some(n) != except && h.item.title.eq_ignore_ascii_case(title))
+}
+
+fn create(state: &mut State, mut item: Item) -> Answer<()> {
+    writable(state)?;
+    item.origin = Origin::Agent;
+    item.agent = true;
+    item.created = crate::now();
+    item.modified = item.created;
+    journal::check_item(&item).map_err(|why| format!("'{}' was refused: {why}", item.title))?;
+    if title_taken(state, &item.title, None) {
+        return Err(format!("an item called '{}' already exists", item.title).into());
+    }
+    let made = state
+        .items
+        .iter()
+        .filter(|h| h.item.origin == Origin::Agent)
+        .count();
+    if made >= journal::MAX_AGENT_ITEMS {
+        return Err(format!(
+            "the agent space is full ({} items); the owner removes some with `passforme rm`",
+            journal::MAX_AGENT_ITEMS
+        )
+        .into());
+    }
+    let (id, text) = loop {
+        let id = ItemId::generate(&mut UnwrapErr(SysRng));
+        let text = Base64::encode_string(id.as_bytes());
+        if state.items.iter().all(|h| h.id != text) {
+            break (id, text);
         }
     };
-    match crate::field_value(item, Some(field)) {
-        Ok((_, value)) => Response {
-            ok: true,
-            value: Some(value.to_string()),
-            ..Response::default()
-        },
-        Err(e) => Response::error(e.to_string()),
+    writable(state)?.append(&id, &item)?;
+    state.items.push(Held { id: text, item });
+    Ok(())
+}
+
+fn fetch(state: &State, query: &str) -> Answer<Response> {
+    let held = &state.items[pick_made(state, query)?];
+    Ok(Response {
+        ok: true,
+        id: Some(held.id.clone()),
+        item: Some(copy(&held.item)),
+        ..Response::default()
+    })
+}
+
+fn item_id(text: &str) -> Answer<ItemId> {
+    Base64::decode_vec(text)
+        .ok()
+        .and_then(|v| <[u8; 16]>::try_from(v).ok())
+        .map(ItemId::from_bytes)
+        .ok_or_else(|| "bad item id".into())
+}
+
+fn replace(state: &mut State, id: &str, mut item: Item) -> Answer<()> {
+    writable(state)?;
+    let index = state
+        .items
+        .iter()
+        .position(|h| h.id == id)
+        .ok_or("no such item in the agent")?;
+    let current = &state.items[index].item;
+    if current.origin != Origin::Agent {
+        return Err(format!(
+            "'{}' is the owner's: a program can only change the items it made",
+            current.title
+        )
+        .into());
     }
+    item.origin = Origin::Agent;
+    item.agent = true;
+    item.created = current.created;
+    item.modified = crate::now();
+    journal::check_item(&item).map_err(|why| format!("'{}' was refused: {why}", item.title))?;
+    if title_taken(state, &item.title, Some(index)) {
+        return Err(format!("an item called '{}' already exists", item.title).into());
+    }
+    writable(state)?.append(&item_id(id)?, &item)?;
+    state.items[index].item = item;
+    Ok(())
+}
+
+/// The next unused code, marked used only once the journal has it.
+fn code(state: &mut State, query: &str) -> Answer<Response> {
+    writable(state)?;
+    let index = pick_made(state, query)?;
+    let held = &state.items[index];
+    let Some(n) = held.item.codes.iter().position(|c| !c.used) else {
+        return Err(if held.item.codes.is_empty() {
+            format!("'{}' has no recovery codes", held.item.title)
+        } else {
+            format!("all codes of '{}' are used", held.item.title)
+        }
+        .into());
+    };
+    let mut item = copy(&held.item);
+    item.codes[n].used = true;
+    item.modified = crate::now();
+    let id = item_id(&held.id)?;
+    writable(state)?.append(&id, &item)?;
+    let value = item.codes[n].code.clone();
+    let left = item.codes.iter().filter(|c| !c.used).count();
+    state.items[index].item = item;
+    Ok(Response {
+        ok: true,
+        value: Some(value),
+        left: Some(left),
+        ..Response::default()
+    })
 }
